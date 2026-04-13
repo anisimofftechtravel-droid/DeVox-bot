@@ -159,7 +159,7 @@ def get_place_emoji(name):
     return "📍"
 
 def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
-    """Поиск мест через 2GIS API с диагностикой"""
+    """Поиск мест через 2GIS API с исправленной обработкой координат"""
     print(f"🔍 2GIS запрос: lat={lat}, lon={lon}")
     
     url = "https://catalog.api.2gis.ru/3.0/items"
@@ -178,7 +178,6 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
         
         if response.status_code != 200:
             print(f"❌ Ошибка 2GIS: {response.status_code}")
-            print(f"   Ответ: {response.text[:200]}")
             return None
         
         data = response.json()
@@ -192,24 +191,36 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
                 name = item.get("name", "")
                 if not name: 
                     continue
-                    
-                address = item.get("address_name", "")
-                if item.get("address_comment"):
-                    address += f" ({item['address_comment']})"
-                    
+                
+                # Получаем координаты
                 coords = item.get("point", {})
                 pl_lat = coords.get("lat", 0)
                 pl_lon = coords.get("lon", 0)
                 
+                # Если координаты в массиве
+                if pl_lat == 0 and pl_lon == 0 and "coordinates" in coords:
+                    coord_list = coords["coordinates"]
+                    if len(coord_list) >= 2:
+                        pl_lon = coord_list[0]
+                        pl_lat = coord_list[1]
+                
                 if pl_lat == 0 or pl_lon == 0:
+                    print(f"⚠️ Нет координат для {name}")
                     continue
                 
+                address = item.get("address_name", "")
+                if item.get("address_comment"):
+                    address += f" ({item['address_comment']})"
+                
+                # Расчёт расстояния
                 dx = (pl_lon - lon) * 111000 * math.cos(math.radians(lat))
                 dy = (pl_lat - lat) * 111000
                 dist = int(math.sqrt(dx*dx + dy*dy))
                 
                 rating = round(random.uniform(3.5, 5.0), 1)
                 reviews = random.randint(10, 500)
+                
+                print(f"   ✅ {name} — {dist} м")
                 
                 places.append({
                     "name": name,
