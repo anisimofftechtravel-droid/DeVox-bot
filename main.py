@@ -81,6 +81,8 @@ def send_video(chat_id, video_id):
     payload = {"chat_id": chat_id, "video": video_id}
     try:
         response = requests.post(url, json=payload, timeout=30)
+        if response.status_code == 200:
+            print(f"✅ Видео отправлено")
         return response
     except:
         return None
@@ -159,17 +161,18 @@ def get_place_emoji(name):
     return "📍"
 
 def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
-    """Поиск мест через 2GIS API — универсальная обработка координат"""
+    """Проверенная функция 2GIS из Replit/Pydroid"""
     print(f"🔍 2GIS запрос: lat={lat}, lon={lon}")
     
     url = "https://catalog.api.2gis.ru/3.0/items"
     params = {
-        "q": "кафе ресторан кофейня музей аптека магазин бар",
+        "q": "кафе ресторан кофейня музей аптека магазин бар пекарня",
         "point": f"{lon},{lat}",
         "radius": radius,
         "key": GIS2_API_KEY,
         "sort": "distance",
-        "page_size": limit
+        "fields": "items.name,items.address_name,items.point,items.address_comment",
+        "page_size": min(limit * 2, 10)
     }
     
     try:
@@ -177,67 +180,34 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
         print(f"📊 2GIS статус: {response.status_code}")
         
         if response.status_code != 200:
-            print(f"❌ Ошибка 2GIS: {response.status_code}")
             return None
         
         data = response.json()
         places = []
         
         if "result" in data and "items" in data["result"]:
-            items = data["result"]["items"]
-            print(f"📊 2GIS нашёл {len(items)} мест")
-            
-            for item in items:
+            for item in data["result"]["items"]:
                 name = item.get("name", "")
                 if not name: 
                     continue
-                
-                # Пробуем разные форматы координат
-                coords = item.get("point", {})
-                pl_lat = None
-                pl_lon = None
-                
-                # Формат 1: {"lat": 59.93, "lon": 30.31}
-                if "lat" in coords and "lon" in coords:
-                    pl_lat = coords["lat"]
-                    pl_lon = coords["lon"]
-                # Формат 2: {"latitude": 59.93, "longitude": 30.31}
-                elif "latitude" in coords and "longitude" in coords:
-                    pl_lat = coords["latitude"]
-                    pl_lon = coords["longitude"]
-                # Формат 3: массив [lon, lat]
-                elif isinstance(coords, list) and len(coords) >= 2:
-                    pl_lon = coords[0]
-                    pl_lat = coords[1]
-                # Формат 4: {"coordinates": [lon, lat]}
-                elif "coordinates" in coords and isinstance(coords["coordinates"], list):
-                    pl_lon = coords["coordinates"][0]
-                    pl_lat = coords["coordinates"][1]
-                # Формат 5: {"x": 30.31, "y": 59.93}
-                elif "x" in coords and "y" in coords:
-                    pl_lon = coords["x"]
-                    pl_lat = coords["y"]
-                else:
-                    print(f"⚠️ Неизвестный формат координат для {name}: {coords}")
-                    continue
-                
-                if pl_lat is None or pl_lon is None or pl_lat == 0 or pl_lon == 0:
-                    print(f"⚠️ Нет координат для {name}")
-                    continue
-                
+                    
                 address = item.get("address_name", "")
                 if item.get("address_comment"):
                     address += f" ({item['address_comment']})"
+                    
+                coords = item.get("point", {})
+                pl_lat = coords.get("lat", 0)
+                pl_lon = coords.get("lon", 0)
                 
-                # Расчёт расстояния
+                if pl_lat == 0 or pl_lon == 0:
+                    continue
+                
                 dx = (pl_lon - lon) * 111000 * math.cos(math.radians(lat))
                 dy = (pl_lat - lat) * 111000
                 dist = int(math.sqrt(dx*dx + dy*dy))
                 
                 rating = round(random.uniform(3.5, 5.0), 1)
                 reviews = random.randint(10, 500)
-                
-                print(f"   ✅ {name} — {dist} м")
                 
                 places.append({
                     "name": name,
@@ -253,7 +223,7 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
                 if len(places) >= limit:
                     break
         
-        print(f"📍 Обработано мест: {len(places)}")
+        print(f"📍 Найдено мест: {len(places)}")
         return places if places else None
         
     except Exception as e:
@@ -375,5 +345,5 @@ def handle_location(chat_id, lat, lon):
 # ========== ЗАПУСК ==========
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render!")
+    print("🤖 DeVox запущен на Render с 2GIS!")
     app.run(host='0.0.0.0', port=port)
