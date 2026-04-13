@@ -159,7 +159,7 @@ def get_place_emoji(name):
     return "📍"
 
 def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
-    """Поиск мест через 2GIS API с исправленной обработкой координат"""
+    """Поиск мест через 2GIS API — универсальная обработка координат"""
     print(f"🔍 2GIS запрос: lat={lat}, lon={lon}")
     
     url = "https://catalog.api.2gis.ru/3.0/items"
@@ -192,19 +192,36 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
                 if not name: 
                     continue
                 
-                # Получаем координаты
+                # Пробуем разные форматы координат
                 coords = item.get("point", {})
-                pl_lat = coords.get("lat", 0)
-                pl_lon = coords.get("lon", 0)
+                pl_lat = None
+                pl_lon = None
                 
-                # Если координаты в массиве
-                if pl_lat == 0 and pl_lon == 0 and "coordinates" in coords:
-                    coord_list = coords["coordinates"]
-                    if len(coord_list) >= 2:
-                        pl_lon = coord_list[0]
-                        pl_lat = coord_list[1]
+                # Формат 1: {"lat": 59.93, "lon": 30.31}
+                if "lat" in coords and "lon" in coords:
+                    pl_lat = coords["lat"]
+                    pl_lon = coords["lon"]
+                # Формат 2: {"latitude": 59.93, "longitude": 30.31}
+                elif "latitude" in coords and "longitude" in coords:
+                    pl_lat = coords["latitude"]
+                    pl_lon = coords["longitude"]
+                # Формат 3: массив [lon, lat]
+                elif isinstance(coords, list) and len(coords) >= 2:
+                    pl_lon = coords[0]
+                    pl_lat = coords[1]
+                # Формат 4: {"coordinates": [lon, lat]}
+                elif "coordinates" in coords and isinstance(coords["coordinates"], list):
+                    pl_lon = coords["coordinates"][0]
+                    pl_lat = coords["coordinates"][1]
+                # Формат 5: {"x": 30.31, "y": 59.93}
+                elif "x" in coords and "y" in coords:
+                    pl_lon = coords["x"]
+                    pl_lat = coords["y"]
+                else:
+                    print(f"⚠️ Неизвестный формат координат для {name}: {coords}")
+                    continue
                 
-                if pl_lat == 0 or pl_lon == 0:
+                if pl_lat is None or pl_lon is None or pl_lat == 0 or pl_lon == 0:
                     print(f"⚠️ Нет координат для {name}")
                     continue
                 
