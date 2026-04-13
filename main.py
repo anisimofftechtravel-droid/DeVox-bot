@@ -36,10 +36,24 @@ def home():
 def webhook():
     try:
         update = request.get_json()
+        
+        # ДИАГНОСТИКА — покажет ВСЁ сообщение от Telegram
+        print("=" * 50)
+        print("📩 ПОЛУЧЕНО ОБНОВЛЕНИЕ:")
+        print(update)
+        print("=" * 50)
+        
         if not update:
             return "ok", 200
         
-        print(f"📩 Получено обновление")
+        # Проверяем, есть ли геопозиция
+        if "message" in update and "location" in update["message"]:
+            print("📍 ГЕОПОЗИЦИЯ ОБНАРУЖЕНА!")
+            lat = update["message"]["location"]["latitude"]
+            lon = update["message"]["location"]["longitude"]
+            print(f"📍 Координаты: lat={lat}, lon={lon}")
+            handle_location(update["message"]["chat"]["id"], lat, lon)
+            return "ok", 200
         
         if "message" in update:
             handle_message(update["message"])
