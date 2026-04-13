@@ -42,11 +42,9 @@ def webhook():
             
             print(f"📍 Геопозиция от {chat_id}: {lat}, {lon}")
             
-            # Сохраняем язык пользователя (если ещё нет)
             if chat_id not in user_lang:
                 user_lang[chat_id] = "ru"
             
-            # Отправляем места
             send_welcome_and_places(chat_id, lat, lon)
             return "ok", 200
         
@@ -61,7 +59,7 @@ def webhook():
         print(f"❌ Ошибка: {e}")
         return "error", 500
 
-# ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
+# ========== TELEGRAM ФУНКЦИИ ==========
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     url = f"{BASE_URL}/sendMessage"
     if parse_mode == "MarkdownV2":
@@ -161,45 +159,77 @@ def get_place_emoji(name):
     return "📍"
 
 def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
+    """Поиск мест через 2GIS API с диагностикой"""
+    print(f"🔍 2GIS запрос: lat={lat}, lon={lon}")
+    
     url = "https://catalog.api.2gis.ru/3.0/items"
     params = {
-        "q": "кафе ресторан кофейня музей аптека магазин бар пекарня",
+        "q": "кафе ресторан кофейня музей аптека магазин бар",
         "point": f"{lon},{lat}",
         "radius": radius,
         "key": GIS2_API_KEY,
         "sort": "distance",
         "page_size": limit
     }
+    
     try:
         response = requests.get(url, params=params, timeout=10)
+        print(f"📊 2GIS статус: {response.status_code}")
+        
         if response.status_code != 200:
+            print(f"❌ Ошибка 2GIS: {response.status_code}")
+            print(f"   Ответ: {response.text[:200]}")
             return None
+        
         data = response.json()
         places = []
+        
         if "result" in data and "items" in data["result"]:
-            for item in data["result"]["items"]:
+            items = data["result"]["items"]
+            print(f"📊 2GIS нашёл {len(items)} мест")
+            
+            for item in items:
                 name = item.get("name", "")
-                if not name: continue
+                if not name: 
+                    continue
+                    
                 address = item.get("address_name", "")
                 if item.get("address_comment"):
                     address += f" ({item['address_comment']})"
+                    
                 coords = item.get("point", {})
                 pl_lat = coords.get("lat", 0)
                 pl_lon = coords.get("lon", 0)
-                if pl_lat == 0 or pl_lon == 0: continue
+                
+                if pl_lat == 0 or pl_lon == 0:
+                    continue
+                
                 dx = (pl_lon - lon) * 111000 * math.cos(math.radians(lat))
                 dy = (pl_lat - lat) * 111000
                 dist = int(math.sqrt(dx*dx + dy*dy))
+                
                 rating = round(random.uniform(3.5, 5.0), 1)
                 reviews = random.randint(10, 500)
+                
                 places.append({
-                    "name": name, "address": address, "distance": f"{dist} м",
-                    "lat": pl_lat, "lon": pl_lon, "emoji": get_place_emoji(name),
-                    "rating": rating, "reviews": reviews
+                    "name": name,
+                    "address": address,
+                    "distance": f"{dist} м",
+                    "lat": pl_lat,
+                    "lon": pl_lon,
+                    "emoji": get_place_emoji(name),
+                    "rating": rating,
+                    "reviews": reviews
                 })
-                if len(places) >= limit: break
+                
+                if len(places) >= limit:
+                    break
+        
+        print(f"📍 Обработано мест: {len(places)}")
         return places if places else None
-    except:
+        
+    except Exception as e:
+        print(f"❌ Ошибка 2GIS: {e}")
         return None
 
 def ask_yandexgpt(question, user_lang_code="ru"):
