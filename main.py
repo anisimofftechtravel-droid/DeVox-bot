@@ -3,23 +3,8 @@ import time
 import math
 import random
 import re
-from flask import Flask
-from threading import Thread
-
-# ========== ВЕБ-СЕРВЕР ==========
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "🤖 DeVox Bot is running!"
-
-def run_web():
-    app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = Thread(target=run_web)
-    t.daemon = True
-    t.start()
+import os
+from flask import Flask, request, jsonify
 
 # ========== НАСТРОЙКИ ==========
 TOKEN = "8722389716:AAGk_VALpULbLGzdK1Dqsb5AS1sWwQwP69c"
@@ -34,14 +19,35 @@ user_lang = {}
 user_last_location = {}
 user_taps = {}
 
-# ========== АНИМАЦИИ ==========
-animations = {
-    "thinking": ["BAACAgIAAxkBAAIFOWnZZw09s7KrWkqDMw8aU29KBCd4AAJ4mwACXIjISpqd6_XuB4UaOwQ"],
-    "pet_level_1": "BAACAgIAAxkBAAIFtmnZeQW0mj-A2L5QrkMxRmAAAZjqcAACqJMAAnQYoUoNOhJH5nPCEjsE",
-    "pet_level_2": "BAACAgIAAyEFAASH3GjZAAICemnVoPJHTrJOisgOBqnkSiCPBzCQAALXnQAC-JWxSnfAxJuKO7a4OwQ",
-    "pet_level_3": "BAACAgIAAxkBAAIFu2nZeZCKTOMcQNyTrN1Y8HHo6_lFAAKzmwACXIjISiN4C46JruovOwQ"
-}
+# ========== ВЕБ-СЕРВЕР ==========
+app = Flask(__name__)
 
+@app.route('/')
+def home():
+    return "🤖 DeVox Bot is running!"
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Telegram отправляет сюда все обновления"""
+    try:
+        update = request.get_json()
+        if not update:
+            return "ok", 200
+        
+        print(f"📩 Получено обновление: {update.get('message', {}).get('text', 'не текст')}")
+        
+        if "message" in update:
+            handle_message(update["message"])
+        elif "callback_query" in update:
+            cb = update["callback_query"]
+            handle_callback(cb["message"]["chat"]["id"], cb["data"], cb["id"])
+        
+        return "ok", 200
+    except Exception as e:
+        print(f"❌ Ошибка в вебхуке: {e}")
+        return "error", 500
+
+# ========== TELEGRAM ФУНКЦИИ ==========
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     url = f"{BASE_URL}/sendMessage"
     if parse_mode == "MarkdownV2":
@@ -51,8 +57,11 @@ def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
-        return requests.post(url, json=payload, timeout=30)
-    except:
+        response = requests.post(url, json=payload, timeout=30)
+        print(f"📤 Сообщение отправлено: {response.status_code}")
+        return response
+    except Exception as e:
+        print(f"❌ Ошибка send_message: {e}")
         return None
 
 def send_video(chat_id, video_id):
@@ -61,33 +70,41 @@ def send_video(chat_id, video_id):
     try:
         response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
-            print(f"✅ Видео отправлено")
+            print(f"✅ Видео отправлено: {video_id[:20]}...")
+        else:
+            print(f"❌ Ошибка видео: {response.status_code}")
         return response
-    except:
+    except Exception as e:
+        print(f"❌ Ошибка send_video: {e}")
         return None
 
 def send_random_thinking(chat_id):
-    send_video(chat_id, random.choice(animations["thinking"]))
+    video_id = random.choice(animations["thinking"])
+    print(f"🎬 Отправляю анимацию 'думает'")
+    return send_video(chat_id, video_id)
 
-def get_updates(offset=None):
-    url = f"{BASE_URL}/getUpdates"
-    if offset:
-        url += f"?offset={offset}"
-    try:
-        response = requests.get(url, timeout=15)
-        return response.json()["result"]
-    except:
-        return []
+# ========== АНИМАЦИИ ==========
+animations = {
+    "thinking": ["BAACAgIAAxkBAAIFOWnZZw09s7KrWkqDMw8aU29KBCd4AAJ4mwACXIjISpqd6_XuB4UaOwQ"],
+    "pet_level_1": "BAACAgIAAxkBAAIFtmnZeQW0mj-A2L5QrkMxRmAAAZjqcAACqJMAAnQYoUoNOhJH5nPCEjsE",
+    "pet_level_2": "BAACAgIAAyEFAASH3GjZAAICemnVoPJHTrJOisgOBqnkSiCPBzCQAALXnQAC-JWxSnfAxJuKO7a4OwQ",
+    "pet_level_3": "BAACAgIAAxkBAAIFu2nZeZCKTOMcQNyTrN1Y8HHo6_lFAAKzmwACXIjISiN4C46JruovOwQ"
+}
 
+# ========== TTS (ГОЛОС) ==========
 def text_to_voice_yandex(text, chat_id, lang="ru"):
     if len(text) > 5000:
         text = text[:4997] + "..."
+    
     clean_text = re.sub(r'[^\w\s\.\,\!\?\-\—\ ]', '', text)
     clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+    
     if len(clean_text) == 0:
         return False
+    
     url = "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize"
     headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}"}
+    
     data = {
         "text": clean_text,
         "lang": "ru-RU",
@@ -96,19 +113,30 @@ def text_to_voice_yandex(text, chat_id, lang="ru"):
         "speed": 1.0,
         "format": "oggopus"
     }
+    
     try:
         print(f"🎙️ Озвучиваю: {clean_text[:50]}...")
         response = requests.post(url, headers=headers, data=data, timeout=30)
+        
         if response.status_code == 200:
             files = {"voice": ("voice.ogg", response.content, "audio/ogg")}
-            send_result = requests.post(f"{BASE_URL}/sendVoice", data={"chat_id": chat_id}, files=files, timeout=30)
+            send_result = requests.post(
+                f"{BASE_URL}/sendVoice",
+                data={"chat_id": chat_id},
+                files=files,
+                timeout=30
+            )
             if send_result.status_code == 200:
                 print("✅ Голос отправлен!")
                 return True
+        else:
+            print(f"❌ TTS ошибка: {response.status_code}")
         return False
-    except:
+    except Exception as e:
+        print(f"❌ TTS исключение: {e}")
         return False
 
+# ========== КНОПКИ ==========
 def get_language_keyboard():
     return {"inline_keyboard": [[
         {"text": "🇷🇺 Русский", "callback_data": "lang_ru"},
@@ -122,6 +150,7 @@ def get_location_reply_keyboard():
 def get_pet_only_keyboard():
     return {"inline_keyboard": [[{"text": "🐺 Погладить волка", "callback_data": "pet"}]]}
 
+# ========== ГЕО ==========
 def get_address(lat, lon, lang="ru"):
     url = "https://geocode-maps.yandex.ru/1.x/"
     params = {"geocode": f"{lon},{lat}", "format": "json", "apikey": YANDEX_GEO_KEY, "results": 1}
@@ -129,6 +158,7 @@ def get_address(lat, lon, lang="ru"):
         params["lang"] = "en_US"
     elif lang == "zh":
         params["lang"] = "zh_CN"
+    
     try:
         data = requests.get(url, params=params, timeout=10).json()
         if "response" in data:
@@ -141,13 +171,13 @@ def get_address(lat, lon, lang="ru"):
 
 def get_place_emoji(name):
     nl = name.lower()
-    if "кафе" in nl: return "☕"
-    if "ресторан" in nl: return "🍽️"
-    if "музей" in nl: return "🏛️"
-    if "аптека" in nl: return "💊"
-    if "магазин" in nl: return "🛍️"
-    if "бар" in nl or "паб" in nl: return "🍺"
-    if "пекарн" in nl: return "🥖"
+    if "кафе" in nl or "coffee" in nl or "cafe" in nl: return "☕"
+    if "ресторан" in nl or "restaurant" in nl: return "🍽️"
+    if "музей" in nl or "museum" in nl: return "🏛️"
+    if "аптека" in nl or "pharmacy" in nl: return "💊"
+    if "магазин" in nl or "shop" in nl: return "🛍️"
+    if "бар" in nl or "bar" in nl or "паб" in nl: return "🍺"
+    if "пекарн" in nl or "bakery" in nl: return "🥖"
     return "📍"
 
 def get_nearby_places_with_coords(lat, lon, radius=1000, limit=10):
@@ -190,6 +220,7 @@ def get_nearby_places_with_coords(lat, lon, radius=1000, limit=10):
     except:
         return None
 
+# ========== AI (YandexGPT) ==========
 def ask_yandexgpt(question, user_lang_code="ru"):
     if user_lang_code == "ru":
         system_prompt = "Ты — DeVox, помощник для путешествий. Отвечай на русском языке. Отвечай о городах, достопримечательностях, культуре, географии, климате, транспорте, кухне, истории, традициях. Отвечай кратко, используй эмодзи."
@@ -197,6 +228,7 @@ def ask_yandexgpt(question, user_lang_code="ru"):
         system_prompt = "You are DeVox, a travel assistant. Answer in English. Answer about cities, attractions, culture, geography, climate, transport, cuisine, history, traditions. Answer briefly, use emojis."
     else:
         system_prompt = "你是DeVox，旅行助手。用中文回答。回答关于城市、景点、文化、地理、气候、交通、美食、历史、传统的问题。回答简短，使用表情符号。"
+    
     url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
     headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
     payload = {
@@ -212,6 +244,7 @@ def ask_yandexgpt(question, user_lang_code="ru"):
     except:
         return "🤖 Ошибка"
 
+# ========== ОСНОВНЫЕ ФУНКЦИИ ==========
 def handle_pet(chat_id):
     taps = user_taps.get(chat_id, 0) + 1
     user_taps[chat_id] = taps if taps <= 3 else 1
@@ -226,17 +259,20 @@ def send_welcome_and_places(chat_id, lat, lon):
     lang = user_lang.get(chat_id, "ru")
     address = get_address(lat, lon, lang)
     places = get_nearby_places_with_coords(lat, lon)
+    
     if lang == "en":
         msg = f"🌟 *Welcome to DeVox!*\n📍 *Your location:*\n{address}\n\n🏛 *Nearby places:*\n\n"
     elif lang == "zh":
         msg = f"🌟 *欢迎使用 DeVox！*\n📍 *您的位置:*\n{address}\n\n🏛 *附近的地方:*\n\n"
     else:
         msg = f"🌟 *Добро пожаловать в DeVox!*\n📍 *Твоё местоположение:*\n{address}\n\n🏛 *Ближайшие места:*\n\n"
+    
     if places:
         for p in places:
             msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n   📍 {p['address']}\n   ⭐ {p['rating']} ★ ({p['reviews']} отзывов)\n\n"
     else:
         msg += "🏛 Места не найдены"
+    
     keyboard = []
     row = []
     if places:
@@ -253,6 +289,7 @@ def send_welcome_and_places(chat_id, lat, lon):
     send_message(chat_id, msg, {"inline_keyboard": keyboard})
 
 def handle_text_message(chat_id, text):
+    print(f"📝 Обработка текста: {text[:50]}")
     send_random_thinking(chat_id)
     lang = user_lang.get(chat_id, "ru")
     answer = ask_yandexgpt(text, lang)
@@ -262,6 +299,7 @@ def handle_text_message(chat_id, text):
 def handle_message(message):
     chat_id = message["chat"]["id"]
     text = message.get("text", "")
+    
     if text == "/start":
         send_video(chat_id, "BAACAgIAAxkBAAID-GnYEdDqQB8Fq-UtPuDK7xVL5DoeAAKJnAACvsrBSvR3HSULCjAkOwQ")
         time.sleep(0.5)
@@ -292,15 +330,18 @@ def handle_callback(chat_id, data, callback_id):
         requests.post(f"{BASE_URL}/answerCallbackQuery", json={"callback_query_id": callback_id})
     except:
         pass
+    
     if data.startswith("lang_"):
         lang = data.split("_")[1]
         user_lang[chat_id] = lang
+        
         if lang == "ru":
             msg = "✅ *Язык выбран: Русский*\n\n📍 Отправь геопозицию"
         elif lang == "en":
             msg = "✅ *Language selected: English*\n\n📍 Send your location"
         else:
             msg = "✅ *语言已选择：中文*\n\n📍 发送您的位置"
+        
         send_message(chat_id, msg, get_location_reply_keyboard())
     elif data == "pet":
         handle_pet(chat_id)
@@ -311,26 +352,14 @@ def handle_location(chat_id, lat, lon):
 
 # ========== ЗАПУСК ==========
 if __name__ == "__main__":
-    keep_alive()
-    time.sleep(1)
-    print("🤖 DeVox запущен на Render!")
-    last_id = 0
-    while True:
-        try:
-            updates = get_updates(offset=last_id + 1)
-            for upd in updates:
-                if "message" in upd:
-                    msg = upd["message"]
-                    cid = msg["chat"]["id"]
-                    if "location" in msg:
-                        handle_location(cid, msg["location"]["latitude"], msg["location"]["longitude"])
-                    else:
-                        handle_message(msg)
-                elif "callback_query" in upd:
-                    cb = upd["callback_query"]
-                    handle_callback(cb["message"]["chat"]["id"], cb["data"], cb["id"])
-                last_id = upd["update_id"]
-            time.sleep(1)
-        except Exception as e:
-            print(f"⚠️ Ошибка: {e}")
-            time.sleep(5)
+    # Получаем порт из переменной окружения (Render даёт PORT)
+    port = int(os.environ.get('PORT', 10000))
+    
+    print("=" * 50)
+    print("🤖 DeVox запущен на Render (Webhook mode)!")
+    print(f"✅ Порт: {port}")
+    print("✅ Голос ERMIL для всех языков")
+    print("=" * 50)
+    
+    # Запускаем Flask-сервер
+    app.run(host='0.0.0.0', port=port)
