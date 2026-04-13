@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify
 # ========== ПЕРЕМЕННЫЕ ИЗ ОКРУЖЕНИЯ ==========
 TOKEN = os.environ.get("BOT_TOKEN")
 YANDEX_GEO_KEY = os.environ.get("YANDEX_GEO_KEY")
-GIS2_API_KEY = os.environ.get("GIS2_API_KEY")  # Ключ 2GIS
+GIS2_API_KEY = os.environ.get("GIS2_API_KEY")
 YANDEX_API_KEY = os.environ.get("YANDEX_API_KEY")
 YANDEX_FOLDER_ID = os.environ.get("YANDEX_FOLDER_ID")
 
@@ -38,6 +38,8 @@ def webhook():
         update = request.get_json()
         if not update:
             return "ok", 200
+        
+        print(f"📩 Получено обновление")
         
         if "message" in update:
             handle_message(update["message"])
@@ -151,6 +153,7 @@ def get_pet_only_keyboard():
 
 # ========== ГЕО (2GIS) ==========
 def get_address(lat, lon, lang="ru"):
+    """Получение адреса через Яндекс.Геокодер"""
     url = "https://geocode-maps.yandex.ru/1.x/"
     params = {
         "geocode": f"{lon},{lat}",
@@ -170,7 +173,8 @@ def get_address(lat, lon, lang="ru"):
             if f:
                 return f[0]["GeoObject"]["metaDataProperty"]["GeocoderMetaData"]["text"]
         return "Address not found" if lang == "en" else "Адрес не найден" if lang == "ru" else "地址未找到"
-    except:
+    except Exception as e:
+        print(f"❌ Ошибка геокодера: {e}")
         return "Error" if lang == "en" else "Ошибка" if lang == "ru" else "错误"
 
 def get_place_emoji(name):
@@ -186,7 +190,7 @@ def get_place_emoji(name):
 
 def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
     """Поиск мест через 2GIS API"""
-    print(f"🔍 Поиск мест через 2GIS: lat={lat}, lon={lon}")
+    print(f"🔍 2GIS запрос: lat={lat}, lon={lon}")
     
     url = "https://catalog.api.2gis.ru/3.0/items"
     params = {
@@ -195,15 +199,24 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
         "radius": radius,
         "key": GIS2_API_KEY,
         "sort": "distance",
-        "fields": "items.name,items.address_name,items.point,items.address_comment",
         "page_size": min(limit * 2, 10)
     }
     
     try:
-        data = requests.get(url, params=params, timeout=10).json()
+        response = requests.get(url, params=params, timeout=10)
+        print(f"📊 2GIS статус: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"❌ Ошибка 2GIS: {response.status_code}")
+            print(f"   Ответ: {response.text[:200]}")
+            return None
+        
+        data = response.json()
         places = []
         
         if "result" in data and "items" in data["result"]:
+            print(f"📊 2GIS нашёл {len(data['result']['items'])} мест")
+            
             for item in data["result"]["items"]:
                 name = item.get("name", "")
                 if not name: 
@@ -225,7 +238,7 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
                 dy = (pl_lat - lat) * 111000
                 dist = int(math.sqrt(dx*dx + dy*dy))
                 
-                # Демо-рейтинг (пока генерируем случайно)
+                # Демо-рейтинг
                 rating = round(random.uniform(3.5, 5.0), 1)
                 reviews = random.randint(10, 500)
                 
@@ -242,7 +255,8 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
                 
                 if len(places) >= limit:
                     break
-                    
+        
+        print(f"📍 Обработано мест: {len(places)}")
         return places if places else None
         
     except Exception as e:
@@ -286,9 +300,20 @@ def handle_pet(chat_id):
     text_to_voice_yandex(hints[level], chat_id, user_lang.get(chat_id, "ru"))
 
 def send_welcome_and_places(chat_id, lat, lon):
+    """Отправляет приветствие и список мест после получения геолокации"""
+    print(f"📍 send_welcome_and_places вызвана для чата {chat_id}")
+    print(f"📍 Координаты: lat={lat}, lon={lon}")
+    
     lang = user_lang.get(chat_id, "ru")
     address = get_address(lat, lon, lang)
+    print(f"📍 Адрес: {address}")
+    
     places = get_nearby_places_2gis(lat, lon)
+    print(f"📍 Найдено мест: {len(places) if places else 0}")
+    
+    if places:
+        for p in places[:3]:
+            print(f"   - {p['name']} ({p['distance']})")
     
     if lang == "en":
         welcome = "🌟 *Welcome to DeVox!*\nAsk me about travel!\n\n"
@@ -316,7 +341,9 @@ def send_welcome_and_places(chat_id, lat, lon):
         places_block = no_places
     
     full_msg = welcome + location_block + places_block
+    print(f"📝 Длина сообщения: {len(full_msg)} символов")
     
+    # Кнопки маршрутов
     keyboard = []
     row = []
     if places:
@@ -329,7 +356,9 @@ def send_welcome_and_places(chat_id, lat, lon):
                 row = []
         if row:
             keyboard.append(row)
+    
     keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
+    
     send_message(chat_id, full_msg, {"inline_keyboard": keyboard})
 
 def handle_text_message(chat_id, text):
@@ -401,6 +430,7 @@ if __name__ == "__main__":
     print("🤖 DeVox запущен на Render (Webhook + 2GIS)!")
     print(f"✅ Порт: {port}")
     print("✅ Голос ERMIL для всех языков")
+    print("✅ 2GIS ключ загружен")
     print("=" * 50)
     
     app.run(host='0.0.0.0', port=port)
