@@ -60,20 +60,6 @@ def webhook():
         print(f"❌ Ошибка: {e}")
         return "error", 500
 
-def remove_keyboard(chat_id):
-    """Убирает клавиатуру с кнопкой 'Отправить геопозицию'"""
-    url = f"{BASE_URL}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": "✅",
-        "reply_markup": {"remove_keyboard": True}
-    }
-    try:
-        requests.post(url, json=payload, timeout=30)
-        print(f"🗑️ Клавиатура удалена для {chat_id}")
-    except Exception as e:
-        print(f"❌ Ошибка удаления клавиатуры: {e}")
-
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     url = f"{BASE_URL}/sendMessage"
     if parse_mode == "MarkdownV2":
@@ -382,20 +368,13 @@ def handle_message(message):
             send_message(chat_id, f"📍 {answer}", get_pet_only_keyboard())
             text_to_voice_yandex(answer, chat_id, user_lang.get(chat_id, "ru"))
         else:
-            if not user_has_location.get(chat_id, False):
-                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
-            else:
-                send_message(chat_id, "📍 Геопозиция не найдена. Отправьте геопозицию ещё раз.", get_location_reply_keyboard())
+            send_message(chat_id, "📍 Сначала отправь геопозицию", get_location_reply_keyboard())
     elif text.lower() in ["что рядом", "места рядом", "nearby places", "附近的地方"]:
         if chat_id in user_last_location:
             lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
             send_welcome_and_places(chat_id, lat, lon)
         else:
-            if not user_has_location.get(chat_id, False):
-                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
-                user_has_location[chat_id] = False
-            else:
-                send_message(chat_id, "📍 Геопозиция не найдена", get_pet_only_keyboard())
+            send_message(chat_id, "📍 Сначала отправь геопозицию", get_location_reply_keyboard())
     else:
         handle_text_message(chat_id, text)
 
@@ -418,21 +397,19 @@ def handle_callback(chat_id, data, callback_id):
         
         send_message(chat_id, msg)
         
-        # Показываем кнопку ТОЛЬКО если геопозиция ещё не отправлена
-        if not user_has_location.get(chat_id, False):
-            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+        # ВСЕГДА показываем кнопку геопозиции
+        send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
     
     elif data == "pet":
         handle_pet(chat_id)
 
 def handle_location(chat_id, lat, lon):
     print(f"📍 handle_location: сохранение геопозиции для {chat_id}")
-    remove_keyboard(chat_id)  # Убираем старую клавиатуру
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
     user_has_location[chat_id] = True
     send_welcome_and_places(chat_id, lat, lon)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с погодой и улучшенной озвучкой!")
+    print("🤖 DeVox запущен на Render!")
     app.run(host='0.0.0.0', port=port)
