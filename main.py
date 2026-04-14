@@ -34,7 +34,6 @@ def webhook():
         if not update:
             return "ok", 200
         
-        # Обработка геопозиции
         if "message" in update and "location" in update["message"]:
             chat_id = update["message"]["chat"]["id"]
             lat = update["message"]["location"]["latitude"]
@@ -59,7 +58,6 @@ def webhook():
         print(f"❌ Ошибка: {e}")
         return "error", 500
 
-# ========== TELEGRAM ФУНКЦИИ ==========
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     url = f"{BASE_URL}/sendMessage"
     if parse_mode == "MarkdownV2":
@@ -150,6 +148,39 @@ def get_address(lat, lon, lang="ru"):
     except:
         return "Ошибка"
 
+def get_weather(lat, lon, lang="ru"):
+    try:
+        url = f"https://wttr.in/{lat},{lon}?format=j1&lang={lang}"
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            return None
+        data = response.json()
+        current = data.get("current_condition", [{}])[0]
+        temp = current.get("temp_C", "?")
+        weather_code = current.get("weatherCode", "0")
+        weather_emoji = {
+            "113": "☀️", "116": "⛅", "119": "☁️", "122": "☁️",
+            "176": "🌧️", "179": "🌨️", "182": "🌧️", "185": "🌧️",
+            "200": "⛈️", "227": "🌨️", "230": "🌨️", "248": "🌫️",
+            "260": "🌫️", "263": "🌧️", "266": "🌧️", "281": "🌧️",
+            "284": "🌧️", "293": "🌧️", "296": "🌧️", "299": "🌧️",
+            "302": "🌧️", "305": "🌧️", "308": "🌧️"
+        }
+        emoji = weather_emoji.get(weather_code, "🌡️")
+        wind_speed = current.get("windspeedKmph", "?")
+        humidity = current.get("humidity", "?")
+        weather_desc = current.get("lang_ru", [{}])[0].get("value", "")
+        if not weather_desc:
+            weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
+        if lang == "en":
+            weather_text = f"{emoji} {temp}°C, {weather_desc} 💨 {wind_speed} km/h 💧 {humidity}%"
+        else:
+            weather_text = f"{emoji} {temp}°C, {weather_desc} 💨 {wind_speed} м/с 💧 {humidity}%"
+        return weather_text
+    except Exception as e:
+        print(f"❌ Ошибка погоды: {e}")
+        return None
+
 def get_place_emoji(name):
     nl = name.lower()
     if "кафе" in nl or "cafe" in nl: return "☕"
@@ -161,9 +192,7 @@ def get_place_emoji(name):
     return "📍"
 
 def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
-    """Проверенная функция 2GIS из Replit/Pydroid"""
     print(f"🔍 2GIS запрос: lat={lat}, lon={lon}")
-    
     url = "https://catalog.api.2gis.ru/3.0/items"
     params = {
         "q": "кафе ресторан кофейня музей аптека магазин бар пекарня",
@@ -174,41 +203,31 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
         "fields": "items.name,items.address_name,items.point,items.address_comment",
         "page_size": min(limit * 2, 10)
     }
-    
     try:
         response = requests.get(url, params=params, timeout=10)
         print(f"📊 2GIS статус: {response.status_code}")
-        
         if response.status_code != 200:
             return None
-        
         data = response.json()
         places = []
-        
         if "result" in data and "items" in data["result"]:
             for item in data["result"]["items"]:
                 name = item.get("name", "")
                 if not name: 
                     continue
-                    
                 address = item.get("address_name", "")
                 if item.get("address_comment"):
                     address += f" ({item['address_comment']})"
-                    
                 coords = item.get("point", {})
                 pl_lat = coords.get("lat", 0)
                 pl_lon = coords.get("lon", 0)
-                
                 if pl_lat == 0 or pl_lon == 0:
                     continue
-                
                 dx = (pl_lon - lon) * 111000 * math.cos(math.radians(lat))
                 dy = (pl_lat - lat) * 111000
                 dist = int(math.sqrt(dx*dx + dy*dy))
-                
                 rating = round(random.uniform(3.5, 5.0), 1)
                 reviews = random.randint(10, 500)
-                
                 places.append({
                     "name": name,
                     "address": address,
@@ -219,13 +238,10 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
                     "rating": rating,
                     "reviews": reviews
                 })
-                
                 if len(places) >= limit:
                     break
-        
         print(f"📍 Найдено мест: {len(places)}")
         return places if places else None
-        
     except Exception as e:
         print(f"❌ Ошибка 2GIS: {e}")
         return None
@@ -270,25 +286,55 @@ def handle_pet(chat_id):
 def send_welcome_and_places(chat_id, lat, lon):
     lang = user_lang.get(chat_id, "ru")
     address = get_address(lat, lon, lang)
+    weather = get_weather(lat, lon, lang)
     places = get_nearby_places_2gis(lat, lon)
     
     if lang == "en":
-        msg = f"🌟 *Welcome to DeVox!*\n📍 *Your location:*\n{address}\n\n🏛 *Nearby places:*\n\n"
+        welcome = "🌟 *Welcome to DeVox!*\nAsk me about travel!\n\n"
+        location_block = f"📍 *Your location:*\n{address}\n\n"
+        weather_block = f"🌤️ *Weather:* {weather}\n\n" if weather else ""
+        places_title = "🏛 *Nearby places:*\n\n"
+        no_places = "🏛 No places found nearby"
     elif lang == "zh":
-        msg = f"🌟 *欢迎使用 DeVox！*\n📍 *您的位置:*\n{address}\n\n🏛 *附近的地方:*\n\n"
+        welcome = "🌟 *欢迎使用 DeVox！*\n问我关于旅行的事情！\n\n"
+        location_block = f"📍 *您的位置:*\n{address}\n\n"
+        weather_block = f"🌤️ *天气:* {weather}\n\n" if weather else ""
+        places_title = "🏛 *附近的地方:*\n\n"
+        no_places = "🏛 附近没有找到地方"
     else:
-        msg = f"🌟 *Добро пожаловать в DeVox!*\n📍 *Твоё местоположение:*\n{address}\n\n🏛 *Ближайшие места:*\n\n"
+        welcome = "🌟 *Добро пожаловать в DeVox!*\nСпроси меня о путешествиях!\n\n"
+        location_block = f"📍 *Твоё местоположение:*\n{address}\n\n"
+        weather_block = f"🌤️ *Погода:* {weather}\n\n" if weather else ""
+        places_title = "🏛 *Ближайшие места:*\n\n"
+        no_places = "🏛 Не удалось найти места рядом"
+    
+    full_msg = welcome + location_block + weather_block
     
     if places:
+        full_msg += places_title
         for p in places:
-            msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n"
-            msg += f"   📍 {p['address']}\n"
-            msg += f"   ⭐ {p['rating']} ★ ({p['reviews']} отзывов)\n\n"
+            full_msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n"
+            full_msg += f"   📍 {p['address']}\n"
+            full_msg += f"   ⭐ {p['rating']} ★ ({p['reviews']} отзывов)\n\n"
     else:
-        msg += "🏛 Места не найдены"
+        full_msg += no_places
     
-    send_message(chat_id, msg, get_pet_only_keyboard())
-    text_to_voice_yandex(msg, chat_id, lang)
+    keyboard = []
+    row = []
+    if places:
+        for p in places:
+            url = f"https://yandex.ru/maps/?rtext={lon},{lat}~{p['lon']},{p['lat']}&rtt=pd"
+            name = p['name'].split(',')[0][:18]
+            row.append({"text": f"{p['emoji']} {name}", "url": url})
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+    keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
+    
+    send_message(chat_id, full_msg, {"inline_keyboard": keyboard})
+    text_to_voice_yandex(full_msg, chat_id, lang)
 
 def handle_text_message(chat_id, text):
     send_random_thinking(chat_id)
@@ -304,7 +350,7 @@ def handle_message(message):
     if text == "/start":
         send_video(chat_id, "BAACAgIAAxkBAAID-GnYEdDqQB8Fq-UtPuDK7xVL5DoeAAKJnAACvsrBSvR3HSULCjAkOwQ")
         time.sleep(0.5)
-        send_message(chat_id, "🌍 *Выберите язык:*", get_language_keyboard())
+        send_message(chat_id, "🌍 *Выберите язык / Select language / 选择语言:*", get_language_keyboard())
     elif text == "/pet":
         handle_pet(chat_id)
     elif text.lower() in ["где я", "мой адрес", "where am i", "我的位置"]:
@@ -342,8 +388,7 @@ def handle_location(chat_id, lat, lon):
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
     send_welcome_and_places(chat_id, lat, lon)
 
-# ========== ЗАПУСК ==========
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с 2GIS!")
+    print("🤖 DeVox запущен на Render с погодой!")
     app.run(host='0.0.0.0', port=port)
