@@ -18,6 +18,7 @@ BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 user_lang = {}
 user_last_location = {}
 user_taps = {}
+user_has_location = {}  # Запоминаем, отправлял ли пользователь геопозицию
 
 # ========== ВЕБ-СЕРВЕР ==========
 app = Flask(__name__)
@@ -44,7 +45,7 @@ def webhook():
             if chat_id not in user_lang:
                 user_lang[chat_id] = "ru"
             
-            send_welcome_and_places(chat_id, lat, lon)
+            handle_location(chat_id, lat, lon)
             return "ok", 200
         
         if "message" in update:
@@ -308,6 +309,7 @@ def send_welcome_and_places(chat_id, lat, lon):
         places_title = "🏛 *Ближайшие места:*\n\n"
         no_places = "🏛 Не удалось найти места рядом"
     
+    # Полное сообщение (для отправки в чат)
     full_msg = welcome + location_block + weather_block
     
     if places:
@@ -319,6 +321,7 @@ def send_welcome_and_places(chat_id, lat, lon):
     else:
         full_msg += no_places
     
+    # Кнопки маршрутов
     keyboard = []
     row = []
     if places:
@@ -333,8 +336,12 @@ def send_welcome_and_places(chat_id, lat, lon):
             keyboard.append(row)
     keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
     
+    # Отправляем полное сообщение в чат
     send_message(chat_id, full_msg, {"inline_keyboard": keyboard})
-    text_to_voice_yandex(full_msg, chat_id, lang)
+    
+    # 🎙️ ГОЛОС: только приветствие + адрес + погода (без мест!)
+    voice_msg = welcome + location_block + weather_block
+    text_to_voice_yandex(voice_msg, chat_id, lang)
 
 def handle_text_message(chat_id, text):
     send_random_thinking(chat_id)
@@ -360,13 +367,20 @@ def handle_message(message):
             send_message(chat_id, f"📍 {answer}", get_pet_only_keyboard())
             text_to_voice_yandex(answer, chat_id, user_lang.get(chat_id, "ru"))
         else:
-            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+            if not user_has_location.get(chat_id, False):
+                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+            else:
+                send_message(chat_id, "📍 Геопозиция не найдена", get_pet_only_keyboard())
     elif text.lower() in ["что рядом", "места рядом", "nearby places", "附近的地方"]:
         if chat_id in user_last_location:
             lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
             send_welcome_and_places(chat_id, lat, lon)
         else:
-            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+            if not user_has_location.get(chat_id, False):
+                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+                user_has_location[chat_id] = False
+            else:
+                send_message(chat_id, "📍 Геопозиция не найдена", get_pet_only_keyboard())
     else:
         handle_text_message(chat_id, text)
 
@@ -379,16 +393,29 @@ def handle_callback(chat_id, data, callback_id):
     if data.startswith("lang_"):
         lang = data.split("_")[1]
         user_lang[chat_id] = lang
-        msg = "✅ *Язык выбран: Русский*\n\n📍 Отправь геопозицию" if lang == "ru" else "✅ *Language selected: English*\n\n📍 Send your location" if lang == "en" else "✅ *语言已选择：中文*\n\n📍 发送您的位置"
-        send_message(chat_id, msg, get_location_reply_keyboard())
+        
+        if lang == "ru":
+            msg = "✅ *Язык выбран: Русский*"
+        elif lang == "en":
+            msg = "✅ *Language selected: English*"
+        else:
+            msg = "✅ *语言已选择：中文*"
+        
+        send_message(chat_id, msg)
+        
+        # Показываем кнопку ТОЛЬКО если геопозиция ещё не отправлена
+        if not user_has_location.get(chat_id, False):
+            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+    
     elif data == "pet":
         handle_pet(chat_id)
 
 def handle_location(chat_id, lat, lon):
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
+    user_has_location[chat_id] = True
     send_welcome_and_places(chat_id, lat, lon)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с погодой!")
+    print("🤖 DeVox запущен на Render с погодой и улучшенной озвучкой!")
     app.run(host='0.0.0.0', port=port)
