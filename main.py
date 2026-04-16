@@ -20,13 +20,13 @@ user_last_location = {}
 user_taps = {}
 user_has_location = {}
 
-# ========== АНИМАЦИИ (ОБНОВЛЕННЫЕ) ==========
+# ========== АНИМАЦИИ (ПРОВЕРЕННЫЕ В ТЕСТОВОМ БОТЕ) ==========
 ANIMATIONS = {
+    "welcome": "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA",
     "thinking": "BAACAgIAAxkBAAMCaeFdUzN5tNI4r_mKJW--H3KYSQQAArqfAAJFDQlLzyLg1y5Hj4I7BA",
     "pet_level_1": "BAACAgIAAxkBAAMFaeFg6muihgm2dc0AAZhiX_UsR2sJAALNlQACwHAJS27ieKZuet3qOwQ",
     "pet_level_2": "BAACAgIAAxkBAAMHaeFhRkszZublu0HECvImrEEhjWsAAsuVAALAcAlLeZg8JivhF_I7BA",
     "pet_level_3": "BAACAgIAAxkBAAMIaeFhu973hytPbGYEuen2OgcPYEcAAs-VAALAcAlLYK3Uk3Z4Ivs7BA",
-    "welcome": "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA",
     "green_check": "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA"
 }
 
@@ -45,13 +45,12 @@ def webhook():
         if not update:
             return "ok", 200
         
-        # Обработка геопозиции
         if "message" in update and "location" in update["message"]:
             chat_id = update["message"]["chat"]["id"]
             lat = update["message"]["location"]["latitude"]
             lon = update["message"]["location"]["longitude"]
             
-            print(f"📍 ГЕОЛОКАЦИЯ ПОЛУЧЕНА от {chat_id}: {lat}, {lon}")
+            print(f"📍 Геопозиция от {chat_id}: {lat}, {lon}")
             
             if chat_id not in user_lang:
                 user_lang[chat_id] = "ru"
@@ -72,10 +71,8 @@ def webhook():
 
 def remove_keyboard(chat_id):
     """Убирает клавиатуру и показывает зелёную галочку"""
-    # Отправляем анимацию зелёной галочки
     send_video(chat_id, ANIMATIONS["green_check"])
     
-    # Убираем клавиатуру
     url = f"{BASE_URL}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -111,13 +108,14 @@ def send_video(chat_id, video_id):
         response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
             print(f"✅ Видео отправлено: {video_id[:20]}...")
+        else:
+            print(f"❌ Ошибка видео: {response.status_code}")
         return response
     except Exception as e:
-        print(f"❌ Ошибка send_video: {e}")
+        print(f"❌ Исключение send_video: {e}")
         return None
 
 def send_random_thinking(chat_id):
-    """Отправляет анимацию 'думает'"""
     send_video(chat_id, ANIMATIONS["thinking"])
 
 def text_to_voice_yandex(text, chat_id, lang="ru"):
@@ -144,8 +142,7 @@ def text_to_voice_yandex(text, chat_id, lang="ru"):
             send_result = requests.post(f"{BASE_URL}/sendVoice", data={"chat_id": chat_id}, files=files, timeout=30)
             return send_result.status_code == 200
         return False
-    except Exception as e:
-        print(f"❌ TTS ошибка: {e}")
+    except:
         return False
 
 def get_language_keyboard():
@@ -342,7 +339,6 @@ def send_welcome_and_places(chat_id, lat, lon):
         places_title = "🏛 *Ближайшие места:*\n\n"
         no_places = "🏛 Не удалось найти места рядом"
     
-    # Полное сообщение (для отправки в чат)
     full_msg = welcome + location_block + weather_block
     
     if places:
@@ -354,7 +350,6 @@ def send_welcome_and_places(chat_id, lat, lon):
     else:
         full_msg += no_places
     
-    # Кнопки маршрутов
     keyboard = []
     row = []
     if places:
@@ -369,10 +364,8 @@ def send_welcome_and_places(chat_id, lat, lon):
             keyboard.append(row)
     keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
     
-    # Отправляем полное сообщение в чат
     send_message(chat_id, full_msg, {"inline_keyboard": keyboard})
     
-    # 🎙️ ГОЛОС: только приветствие + адрес + погода (без мест!)
     voice_msg = welcome + location_block + weather_block
     text_to_voice_yandex(voice_msg, chat_id, lang)
 
@@ -436,7 +429,6 @@ def handle_callback(chat_id, data, callback_id):
         
         send_message(chat_id, msg)
         
-        # Показываем кнопку ТОЛЬКО если геопозиция ещё не отправлена
         if not user_has_location.get(chat_id, False):
             send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
     
@@ -445,12 +437,12 @@ def handle_callback(chat_id, data, callback_id):
 
 def handle_location(chat_id, lat, lon):
     print(f"📍 handle_location: сохранение геопозиции для {chat_id}")
-    remove_keyboard(chat_id)  # Убираем клавиатуру и показываем зелёную галочку
+    remove_keyboard(chat_id)
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
     user_has_location[chat_id] = True
     send_welcome_and_places(chat_id, lat, lon)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с новыми анимациями!")
+    print("🤖 DeVox запущен на Render с обновлёнными анимациями!")
     app.run(host='0.0.0.0', port=port)
