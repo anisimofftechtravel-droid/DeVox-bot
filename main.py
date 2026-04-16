@@ -18,7 +18,17 @@ BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 user_lang = {}
 user_last_location = {}
 user_taps = {}
-user_has_location = {}  # Запоминаем, отправлял ли пользователь геопозицию
+user_has_location = {}
+
+# ========== АНИМАЦИИ (ОБНОВЛЕННЫЕ) ==========
+ANIMATIONS = {
+    "thinking": "BAACAgIAAxkBAAMCaeFdUzN5tNI4r_mKJW--H3KYSQQAArqfAAJFDQlLzyLg1y5Hj4I7BA",
+    "pet_level_1": "BAACAgIAAxkBAAMFaeFg6muihgm2dc0AAZhiX_UsR2sJAALNlQACwHAJS27ieKZuet3qOwQ",
+    "pet_level_2": "BAACAgIAAxkBAAMHaeFhRkszZublu0HECvImrEEhjWsAAsuVAALAcAlLeZg8JivhF_I7BA",
+    "pet_level_3": "BAACAgIAAxkBAAMIaeFhu973hytPbGYEuen2OgcPYEcAAs-VAALAcAlLYK3Uk3Z4Ivs7BA",
+    "welcome": "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA",
+    "green_check": "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA"
+}
 
 # ========== ВЕБ-СЕРВЕР ==========
 app = Flask(__name__)
@@ -60,6 +70,24 @@ def webhook():
         print(f"❌ Ошибка: {e}")
         return "error", 500
 
+def remove_keyboard(chat_id):
+    """Убирает клавиатуру и показывает зелёную галочку"""
+    # Отправляем анимацию зелёной галочки
+    send_video(chat_id, ANIMATIONS["green_check"])
+    
+    # Убираем клавиатуру
+    url = f"{BASE_URL}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": "✅",
+        "reply_markup": {"remove_keyboard": True}
+    }
+    try:
+        requests.post(url, json=payload, timeout=30)
+        print(f"🗑️ Клавиатура удалена для {chat_id}")
+    except Exception as e:
+        print(f"❌ Ошибка удаления клавиатуры: {e}")
+
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     url = f"{BASE_URL}/sendMessage"
     if parse_mode == "MarkdownV2":
@@ -82,16 +110,15 @@ def send_video(chat_id, video_id):
     try:
         response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
-            print(f"✅ Видео отправлено")
+            print(f"✅ Видео отправлено: {video_id[:20]}...")
         return response
-    except:
+    except Exception as e:
+        print(f"❌ Ошибка send_video: {e}")
         return None
 
 def send_random_thinking(chat_id):
-    animations = {
-        "thinking": ["BAACAgIAAxkBAAIFOWnZZw09s7KrWkqDMw8aU29KBCd4AAJ4mwACXIjISpqd6_XuB4UaOwQ"]
-    }
-    send_video(chat_id, animations["thinking"][0])
+    """Отправляет анимацию 'думает'"""
+    send_video(chat_id, ANIMATIONS["thinking"])
 
 def text_to_voice_yandex(text, chat_id, lang="ru"):
     if len(text) > 5000:
@@ -117,7 +144,8 @@ def text_to_voice_yandex(text, chat_id, lang="ru"):
             send_result = requests.post(f"{BASE_URL}/sendVoice", data={"chat_id": chat_id}, files=files, timeout=30)
             return send_result.status_code == 200
         return False
-    except:
+    except Exception as e:
+        print(f"❌ TTS ошибка: {e}")
         return False
 
 def get_language_keyboard():
@@ -274,16 +302,20 @@ def handle_pet(chat_id):
     taps = user_taps.get(chat_id, 0) + 1
     user_taps[chat_id] = taps if taps <= 3 else 1
     level = user_taps[chat_id]
-    animations = {
-        "pet_level_1": "BAACAgIAAxkBAAIFtmnZeQW0mj-A2L5QrkMxRmAAAZjqcAACqJMAAnQYoUoNOhJH5nPCEjsE",
-        "pet_level_2": "BAACAgIAAyEFAASH3GjZAAICemnVoPJHTrJOisgOBqnkSiCPBzCQAALXnQAC-JWxSnfAxJuKO7a4OwQ",
-        "pet_level_3": "BAACAgIAAxkBAAIFu2nZeZCKTOMcQNyTrN1Y8HHo6_lFAAKzmwACXIjISiN4C46JruovOwQ"
-    }
-    video_id = animations[f"pet_level_{level}"]
-    hints = {1: "🐺 Ещё разочек?", 2: "🐺✨ Почти финал!", 3: "🌟 Ты настоящий друг!"}
+    
+    if level == 1:
+        video_id = ANIMATIONS["pet_level_1"]
+        hint = "🐺 Ещё разочек?"
+    elif level == 2:
+        video_id = ANIMATIONS["pet_level_2"]
+        hint = "🐺✨ Почти финал!"
+    else:
+        video_id = ANIMATIONS["pet_level_3"]
+        hint = "🌟 Ты настоящий друг!"
+    
     send_video(chat_id, video_id)
-    send_message(chat_id, hints[level], get_pet_only_keyboard())
-    text_to_voice_yandex(hints[level], chat_id, user_lang.get(chat_id, "ru"))
+    send_message(chat_id, hint, get_pet_only_keyboard())
+    text_to_voice_yandex(hint, chat_id, user_lang.get(chat_id, "ru"))
 
 def send_welcome_and_places(chat_id, lat, lon):
     lang = user_lang.get(chat_id, "ru")
@@ -356,7 +388,7 @@ def handle_message(message):
     text = message.get("text", "")
     
     if text == "/start":
-        send_video(chat_id, "BAACAgIAAxkBAAID-GnYEdDqQB8Fq-UtPuDK7xVL5DoeAAKJnAACvsrBSvR3HSULCjAkOwQ")
+        send_video(chat_id, ANIMATIONS["welcome"])
         time.sleep(0.5)
         send_message(chat_id, "🌍 *Выберите язык / Select language / 选择语言:*", get_language_keyboard())
     elif text == "/pet":
@@ -368,13 +400,20 @@ def handle_message(message):
             send_message(chat_id, f"📍 {answer}", get_pet_only_keyboard())
             text_to_voice_yandex(answer, chat_id, user_lang.get(chat_id, "ru"))
         else:
-            send_message(chat_id, "📍 Сначала отправь геопозицию", get_location_reply_keyboard())
+            if not user_has_location.get(chat_id, False):
+                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+            else:
+                send_message(chat_id, "📍 Геопозиция не найдена. Отправьте геопозицию ещё раз.", get_location_reply_keyboard())
     elif text.lower() in ["что рядом", "места рядом", "nearby places", "附近的地方"]:
         if chat_id in user_last_location:
             lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
             send_welcome_and_places(chat_id, lat, lon)
         else:
-            send_message(chat_id, "📍 Сначала отправь геопозицию", get_location_reply_keyboard())
+            if not user_has_location.get(chat_id, False):
+                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+                user_has_location[chat_id] = False
+            else:
+                send_message(chat_id, "📍 Геопозиция не найдена", get_pet_only_keyboard())
     else:
         handle_text_message(chat_id, text)
 
@@ -397,19 +436,21 @@ def handle_callback(chat_id, data, callback_id):
         
         send_message(chat_id, msg)
         
-        # ВСЕГДА показываем кнопку геопозиции
-        send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+        # Показываем кнопку ТОЛЬКО если геопозиция ещё не отправлена
+        if not user_has_location.get(chat_id, False):
+            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
     
     elif data == "pet":
         handle_pet(chat_id)
 
 def handle_location(chat_id, lat, lon):
     print(f"📍 handle_location: сохранение геопозиции для {chat_id}")
+    remove_keyboard(chat_id)  # Убираем клавиатуру и показываем зелёную галочку
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
     user_has_location[chat_id] = True
     send_welcome_and_places(chat_id, lat, lon)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render!")
+    print("🤖 DeVox запущен на Render с новыми анимациями!")
     app.run(host='0.0.0.0', port=port)
