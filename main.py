@@ -20,13 +20,15 @@ user_last_location = {}
 user_taps = {}
 user_has_location = {}
 
-# ========== НОВЫЕ АНИМАЦИИ (ВСЕ ЗАМЕНЕНЫ) ==========
+# ========== АНИМАЦИИ ==========
+# ВСЕ АНИМАЦИИ ОСТАЮТСЯ СТАРЫМИ, КРОМЕ green_check
 animations = {
     "thinking": ["BAACAgIAAxkBAAIFOWnZZw09s7KrWkqDMw8aU29KBCd4AAJ4mwACXIjISpqd6_XuB4UaOwQ"],
     "pet_level_1": "BAACAgIAAxkBAAIFtmnZeQW0mj-A2L5QrkMxRmAAAZjqcAACqJMAAnQYoUoNOhJH5nPCEjsE",
     "pet_level_2": "BAACAgIAAyEFAASH3GjZAAICemnVoPJHTrJOisgOBqnkSiCPBzCQAALXnQAC-JWxSnfAxJuKO7a4OwQ",
     "pet_level_3": "BAACAgIAAxkBAAIFu2nZeZCKTOMcQNyTrN1Y8HHo6_lFAAKzmwACXIjISiN4C46JruovOwQ",
     "welcome": "BAACAgIAAxkBAAID-GnYEdDqQB8Fq-UtPuDK7xVL5DoeAAKJnAACvsrBSvR3HSULCjAkOwQ",
+    # НОВАЯ АНИМАЦИЯ ВМЕСТО ЗЕЛЁНОЙ ГАЛОЧКИ
     "green_check": "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA"
 }
 
@@ -68,22 +70,6 @@ def webhook():
     except Exception as e:
         print(f"❌ Ошибка: {e}")
         return "error", 500
-
-def remove_keyboard(chat_id):
-    """Убирает клавиатуру и показывает НОВУЮ анимацию"""
-    send_video(chat_id, animations["green_check"])
-    
-    url = f"{BASE_URL}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": "✅",
-        "reply_markup": {"remove_keyboard": True}
-    }
-    try:
-        requests.post(url, json=payload, timeout=30)
-        print(f"🗑️ Клавиатура удалена для {chat_id}")
-    except Exception as e:
-        print(f"❌ Ошибка удаления клавиатуры: {e}")
 
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     url = f"{BASE_URL}/sendMessage"
@@ -438,12 +424,28 @@ def handle_callback(chat_id, data, callback_id):
 
 def handle_location(chat_id, lat, lon):
     print(f"📍 Сохранение геопозиции для {chat_id}")
-    remove_keyboard(chat_id)
+    
+    # Отправляем новую анимацию (вместо зелёной галочки)
+    send_video(chat_id, animations["green_check"])
+    
+    # Убираем клавиатуру
+    url = f"{BASE_URL}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": "✅",
+        "reply_markup": {"remove_keyboard": True}
+    }
+    try:
+        requests.post(url, json=payload, timeout=30)
+        print(f"🗑️ Клавиатура удалена для {chat_id}")
+    except Exception as e:
+        print(f"❌ Ошибка удаления клавиатуры: {e}")
+    
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
     user_has_location[chat_id] = True
     send_welcome_and_places(chat_id, lat, lon)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с НОВЫМИ анимациями!")
+    print("🤖 DeVox запущен на Render! Зелёная галочка заменена на новую анимацию!")
     app.run(host='0.0.0.0', port=port)
