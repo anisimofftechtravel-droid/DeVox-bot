@@ -20,13 +20,14 @@ user_last_location = {}
 user_taps = {}
 user_has_location = {}
 
-# ========== АНИМАЦИИ (ТОЛЬКО ТЕ, КОТОРЫЕ РАБОТАЮТ) ==========
+# ========== НОВЫЕ АНИМАЦИИ (ВСЕ ЗАМЕНЕНЫ) ==========
 ANIMATIONS = {
     "thinking": "BAACAgIAAxkBAAMCaeFdUzN5tNI4r_mKJW--H3KYSQQAArqfAAJFDQlLzyLg1y5Hj4I7BA",
     "pet_level_1": "BAACAgIAAxkBAAMFaeFg6muihgm2dc0AAZhiX_UsR2sJAALNlQACwHAJS27ieKZuet3qOwQ",
     "pet_level_2": "BAACAgIAAxkBAAMHaeFhRkszZublu0HECvImrEEhjWsAAsuVAALAcAlLeZg8JivhF_I7BA",
     "pet_level_3": "BAACAgIAAxkBAAMIaeFhu973hytPbGYEuen2OgcPYEcAAs-VAALAcAlLYK3Uk3Z4Ivs7BA",
-    "welcome": "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA"
+    "welcome": "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA",
+    "location_animation": "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA"
 }
 
 # ========== ВЕБ-СЕРВЕР ==========
@@ -69,7 +70,7 @@ def webhook():
         return "error", 500
 
 def remove_keyboard(chat_id):
-    """Только убирает клавиатуру (без анимации)"""
+    """Убирает клавиатуру"""
     url = f"{BASE_URL}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -104,7 +105,7 @@ def send_video(chat_id, video_id):
     try:
         response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
-            print(f"✅ Видео отправлено")
+            print(f"✅ Видео отправлено: {video_id[:20]}...")
         else:
             print(f"❌ Ошибка видео: {response.status_code}")
         return response
@@ -312,6 +313,10 @@ def handle_pet(chat_id):
     text_to_voice_yandex(hint, chat_id, user_lang.get(chat_id, "ru"))
 
 def send_welcome_and_places(chat_id, lat, lon):
+    # Сначала отправляем новую анимацию (вместо зелёной галочки)
+    send_video(chat_id, ANIMATIONS["location_animation"])
+    time.sleep(0.5)
+    
     lang = user_lang.get(chat_id, "ru")
     address = get_address(lat, lon, lang)
     weather = get_weather(lat, lon, lang)
@@ -434,12 +439,12 @@ def handle_callback(chat_id, data, callback_id):
 
 def handle_location(chat_id, lat, lon):
     print(f"📍 Сохранение геопозиции для {chat_id}")
-    remove_keyboard(chat_id)  # Только убираем клавиатуру, без анимации
+    remove_keyboard(chat_id)
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
     user_has_location[chat_id] = True
     send_welcome_and_places(chat_id, lat, lon)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render!")
+    print("🤖 DeVox запущен на Render с новыми анимациями!")
     app.run(host='0.0.0.0', port=port)
