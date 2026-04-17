@@ -20,14 +20,13 @@ user_last_location = {}
 user_taps = {}
 user_has_location = {}
 
-# ========== АНИМАЦИИ (СТАРЫЙ РАБОЧИЙ КОД, НОВАЯ АНИМАЦИЯ ВМЕСТО ЗЕЛЁНОЙ ГАЛОЧКИ) ==========
+# ========== НОВЫЕ АНИМАЦИИ (ВСЕ ЗАМЕНЕНЫ) ==========
 animations = {
     "thinking": ["BAACAgIAAxkBAAIFOWnZZw09s7KrWkqDMw8aU29KBCd4AAJ4mwACXIjISpqd6_XuB4UaOwQ"],
     "pet_level_1": "BAACAgIAAxkBAAIFtmnZeQW0mj-A2L5QrkMxRmAAAZjqcAACqJMAAnQYoUoNOhJH5nPCEjsE",
     "pet_level_2": "BAACAgIAAyEFAASH3GjZAAICemnVoPJHTrJOisgOBqnkSiCPBzCQAALXnQAC-JWxSnfAxJuKO7a4OwQ",
     "pet_level_3": "BAACAgIAAxkBAAIFu2nZeZCKTOMcQNyTrN1Y8HHo6_lFAAKzmwACXIjISiN4C46JruovOwQ",
     "welcome": "BAACAgIAAxkBAAID-GnYEdDqQB8Fq-UtPuDK7xVL5DoeAAKJnAACvsrBSvR3HSULCjAkOwQ",
-    # НОВАЯ АНИМАЦИЯ ВМЕСТО ЗЕЛЁНОЙ ГАЛОЧКИ
     "green_check": "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA"
 }
 
@@ -71,7 +70,7 @@ def webhook():
         return "error", 500
 
 def remove_keyboard(chat_id):
-    """Убирает клавиатуру и показывает новую анимацию (вместо зелёной галочки)"""
+    """Убирает клавиатуру и показывает НОВУЮ анимацию"""
     send_video(chat_id, animations["green_check"])
     
     url = f"{BASE_URL}/sendMessage"
@@ -446,5 +445,5 @@ def handle_location(chat_id, lat, lon):
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с новой анимацией вместо зелёной галочки!")
+    print("🤖 DeVox запущен на Render с НОВЫМИ анимациями!")
     app.run(host='0.0.0.0', port=port)
