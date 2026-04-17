@@ -20,13 +20,14 @@ user_last_location = {}
 user_taps = {}
 user_has_location = {}
 
-# ========== НОВЫЕ АНИМАЦИИ ==========
-ANIMATIONS = {
-    "welcome": "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA",
-    "thinking": "BAACAgIAAxkBAAMCaeFdUzN5tNI4r_mKJW--H3KYSQQAArqfAAJFDQlLzyLg1y5Hj4I7BA",
-    "pet_level_1": "BAACAgIAAxkBAAMFaeFg6muihgm2dc0AAZhiX_UsR2sJAALNlQACwHAJS27ieKZuet3qOwQ",
-    "pet_level_2": "BAACAgIAAxkBAAMHaeFhRkszZublu0HECvImrEEhjWsAAsuVAALAcAlLeZg8JivhF_I7BA",
-    "pet_level_3": "BAACAgIAAxkBAAMIaeFhu973hytPbGYEuen2OgcPYEcAAs-VAALAcAlLYK3Uk3Z4Ivs7BA"
+# ========== АНИМАЦИИ (СТАРАЯ РАБОЧАЯ СТРУКТУРА) ==========
+animations = {
+    "thinking": ["BAACAgIAAxkBAAIFOWnZZw09s7KrWkqDMw8aU29KBCd4AAJ4mwACXIjISpqd6_XuB4UaOwQ"],
+    "pet_level_1": "BAACAgIAAxkBAAIFtmnZeQW0mj-A2L5QrkMxRmAAAZjqcAACqJMAAnQYoUoNOhJH5nPCEjsE",
+    "pet_level_2": "BAACAgIAAyEFAASH3GjZAAICemnVoPJHTrJOisgOBqnkSiCPBzCQAALXnQAC-JWxSnfAxJuKO7a4OwQ",
+    "pet_level_3": "BAACAgIAAxkBAAIFu2nZeZCKTOMcQNyTrN1Y8HHo6_lFAAKzmwACXIjISiN4C46JruovOwQ",
+    "welcome": "BAACAgIAAxkBAAID-GnYEdDqQB8Fq-UtPuDK7xVL5DoeAAKJnAACvsrBSvR3HSULCjAkOwQ",
+    "green_check": "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA"
 }
 
 # ========== ВЕБ-СЕРВЕР ==========
@@ -69,6 +70,11 @@ def webhook():
         return "error", 500
 
 def remove_keyboard(chat_id):
+    """Убирает клавиатуру и отправляет анимацию вместо зелёной галочки"""
+    # Отправляем анимацию (вместо зелёной галочки)
+    send_video(chat_id, animations["green_check"])
+    
+    # Убираем клавиатуру
     url = f"{BASE_URL}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -103,7 +109,7 @@ def send_video(chat_id, video_id):
     try:
         response = requests.post(url, json=payload, timeout=30)
         if response.status_code == 200:
-            print(f"✅ Видео отправлено")
+            print(f"✅ Видео отправлено: {video_id[:20]}...")
         else:
             print(f"❌ Ошибка видео: {response.status_code}")
         return response
@@ -112,7 +118,8 @@ def send_video(chat_id, video_id):
         return None
 
 def send_random_thinking(chat_id):
-    send_video(chat_id, ANIMATIONS["thinking"])
+    video_id = random.choice(animations["thinking"])
+    send_video(chat_id, video_id)
 
 def text_to_voice_yandex(text, chat_id, lang="ru"):
     if len(text) > 5000:
@@ -297,13 +304,13 @@ def handle_pet(chat_id):
     level = user_taps[chat_id]
     
     if level == 1:
-        video_id = ANIMATIONS["pet_level_1"]
+        video_id = animations["pet_level_1"]
         hint = "🐺 Ещё разочек?"
     elif level == 2:
-        video_id = ANIMATIONS["pet_level_2"]
+        video_id = animations["pet_level_2"]
         hint = "🐺✨ Почти финал!"
     else:
-        video_id = ANIMATIONS["pet_level_3"]
+        video_id = animations["pet_level_3"]
         hint = "🌟 Ты настоящий друг!"
     
     send_video(chat_id, video_id)
@@ -377,7 +384,7 @@ def handle_message(message):
     text = message.get("text", "")
     
     if text == "/start":
-        send_video(chat_id, ANIMATIONS["welcome"])
+        send_video(chat_id, animations["welcome"])
         time.sleep(0.5)
         send_message(chat_id, "🌍 *Выберите язык / Select language / 选择语言:*", get_language_keyboard())
     elif text == "/pet":
@@ -440,5 +447,5 @@ def handle_location(chat_id, lat, lon):
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с новыми анимациями!")
+    print("🤖 DeVox запущен на Render со старыми анимациями!")
     app.run(host='0.0.0.0', port=port)
