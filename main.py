@@ -6,7 +6,6 @@ import re
 import os
 from flask import Flask, request
 
-# ========== ПЕРЕМЕННЫЕ ИЗ ОКРУЖЕНИЯ ==========
 TOKEN = os.environ.get("BOT_TOKEN")
 YANDEX_GEO_KEY = os.environ.get("YANDEX_GEO_KEY")
 GIS2_API_KEY = os.environ.get("GIS2_API_KEY")
@@ -20,17 +19,6 @@ user_last_location = {}
 user_taps = {}
 user_has_location = {}
 
-# ========== НОВЫЕ АНИМАЦИИ ==========
-ANIMATIONS = {
-    "thinking": "BAACAgIAAxkBAAMCaeFdUzN5tNI4r_mKJW--H3KYSQQAArqfAAJFDQlLzyLg1y5Hj4I7BA",
-    "pet_level_1": "BAACAgIAAxkBAAMFaeFg6muihgm2dc0AAZhiX_UsR2sJAALNlQACwHAJS27ieKZuet3qOwQ",
-    "pet_level_2": "BAACAgIAAxkBAAMHaeFhRkszZublu0HECvImrEEhjWsAAsuVAALAcAlLeZg8JivhF_I7BA",
-    "pet_level_3": "BAACAgIAAxkBAAMIaeFhu973hytPbGYEuen2OgcPYEcAAs-VAALAcAlLYK3Uk3Z4Ivs7BA",
-    "welcome": "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA",
-    "new_animation": "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA"
-}
-
-# ========== ВЕБ-СЕРВЕР ==========
 app = Flask(__name__)
 
 @app.route('/')
@@ -41,32 +29,24 @@ def home():
 def webhook():
     try:
         update = request.get_json()
-        
         if not update:
             return "ok", 200
-        
         if "message" in update and "location" in update["message"]:
             chat_id = update["message"]["chat"]["id"]
             lat = update["message"]["location"]["latitude"]
             lon = update["message"]["location"]["longitude"]
-            
-            print(f"📍 Геопозиция от {chat_id}: {lat}, {lon}")
-            
             if chat_id not in user_lang:
                 user_lang[chat_id] = "ru"
-            
             handle_location(chat_id, lat, lon)
             return "ok", 200
-        
         if "message" in update:
             handle_message(update["message"])
         elif "callback_query" in update:
             cb = update["callback_query"]
             handle_callback(cb["message"]["chat"]["id"], cb["data"], cb["id"])
-        
         return "ok", 200
     except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        print(f"Ошибка: {e}")
         return "error", 500
 
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
@@ -78,56 +58,20 @@ def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
-        response = requests.post(url, json=payload, timeout=30)
-        print(f"📤 Сообщение отправлено: {response.status_code}")
-        return response
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        return requests.post(url, json=payload, timeout=30)
+    except:
         return None
 
 def send_video(chat_id, video_id):
     url = f"{BASE_URL}/sendVideo"
-    payload = {"chat_id": chat_id, "video": video_id}
     try:
-        response = requests.post(url, json=payload, timeout=30)
+        response = requests.post(url, json={"chat_id": chat_id, "video": video_id}, timeout=30)
         if response.status_code == 200:
             print(f"✅ Видео отправлено: {video_id[:20]}...")
-        else:
-            print(f"❌ Ошибка видео: {response.status_code}")
         return response
     except Exception as e:
-        print(f"❌ Исключение: {e}")
+        print(f"❌ Ошибка: {e}")
         return None
-
-def send_random_thinking(chat_id):
-    send_video(chat_id, ANIMATIONS["thinking"])
-
-def text_to_voice_yandex(text, chat_id, lang="ru"):
-    if len(text) > 5000:
-        text = text[:4997] + "..."
-    clean_text = re.sub(r'[^\w\s\.\,\!\?\-\—\ ]', '', text)
-    clean_text = re.sub(r'\s+', ' ', clean_text).strip()
-    if len(clean_text) == 0:
-        return False
-    url = "https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize"
-    headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}"}
-    data = {
-        "text": clean_text,
-        "lang": "ru-RU",
-        "voice": "ermil",
-        "emotion": "good",
-        "speed": 1.0,
-        "format": "oggopus"
-    }
-    try:
-        response = requests.post(url, headers=headers, data=data, timeout=30)
-        if response.status_code == 200:
-            files = {"voice": ("voice.ogg", response.content, "audio/ogg")}
-            send_result = requests.post(f"{BASE_URL}/sendVoice", data={"chat_id": chat_id}, files=files, timeout=30)
-            return send_result.status_code == 200
-        return False
-    except:
-        return False
 
 def get_language_keyboard():
     return {"inline_keyboard": [[
@@ -168,93 +112,61 @@ def get_weather(lat, lon, lang="ru"):
         data = response.json()
         current = data.get("current_condition", [{}])[0]
         temp = current.get("temp_C", "?")
-        weather_code = current.get("weatherCode", "0")
-        weather_emoji = {
-            "113": "☀️", "116": "⛅", "119": "☁️", "122": "☁️",
-            "176": "🌧️", "179": "🌨️", "182": "🌧️", "185": "🌧️",
-            "200": "⛈️", "227": "🌨️", "230": "🌨️", "248": "🌫️",
-            "260": "🌫️", "263": "🌧️", "266": "🌧️", "281": "🌧️",
-            "284": "🌧️", "293": "🌧️", "296": "🌧️", "299": "🌧️",
-            "302": "🌧️", "305": "🌧️", "308": "🌧️"
-        }
-        emoji = weather_emoji.get(weather_code, "🌡️")
         wind_speed = current.get("windspeedKmph", "?")
         humidity = current.get("humidity", "?")
         weather_desc = current.get("lang_ru", [{}])[0].get("value", "")
         if not weather_desc:
             weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
-        if lang == "en":
-            weather_text = f"{emoji} {temp}°C, {weather_desc} 💨 {wind_speed} km/h 💧 {humidity}%"
-        else:
-            weather_text = f"{emoji} {temp}°C, {weather_desc} 💨 {wind_speed} м/с 💧 {humidity}%"
-        return weather_text
-    except Exception as e:
-        print(f"❌ Ошибка погоды: {e}")
+        return f"🌡️ {temp}°C, {weather_desc} 💨 {wind_speed} м/с 💧 {humidity}%"
+    except:
         return None
 
 def get_place_emoji(name):
     nl = name.lower()
-    if "кафе" in nl or "cafe" in nl: return "☕"
-    if "ресторан" in nl or "restaurant" in nl: return "🍽️"
-    if "музей" in nl or "museum" in nl: return "🏛️"
+    if "кафе" in nl: return "☕"
+    if "ресторан" in nl: return "🍽️"
+    if "музей" in nl: return "🏛️"
     if "аптека" in nl: return "💊"
     if "магазин" in nl: return "🛍️"
     if "бар" in nl or "паб" in nl: return "🍺"
     return "📍"
 
 def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
-    print(f"🔍 2GIS запрос: lat={lat}, lon={lon}")
     url = "https://catalog.api.2gis.ru/3.0/items"
     params = {
-        "q": "кафе ресторан кофейня музей аптека магазин бар пекарня",
+        "q": "кафе ресторан кофейня музей аптека магазин бар",
         "point": f"{lon},{lat}",
         "radius": radius,
         "key": GIS2_API_KEY,
         "sort": "distance",
-        "fields": "items.name,items.address_name,items.point,items.address_comment",
-        "page_size": min(limit * 2, 10)
+        "fields": "items.name,items.address_name,items.point",
+        "page_size": limit
     }
     try:
-        response = requests.get(url, params=params, timeout=10)
-        print(f"📊 2GIS статус: {response.status_code}")
-        if response.status_code != 200:
-            return None
-        data = response.json()
+        data = requests.get(url, params=params, timeout=10).json()
         places = []
         if "result" in data and "items" in data["result"]:
             for item in data["result"]["items"]:
                 name = item.get("name", "")
-                if not name: 
-                    continue
+                if not name: continue
                 address = item.get("address_name", "")
-                if item.get("address_comment"):
-                    address += f" ({item['address_comment']})"
                 coords = item.get("point", {})
                 pl_lat = coords.get("lat", 0)
                 pl_lon = coords.get("lon", 0)
-                if pl_lat == 0 or pl_lon == 0:
-                    continue
+                if pl_lat == 0: continue
                 dx = (pl_lon - lon) * 111000 * math.cos(math.radians(lat))
                 dy = (pl_lat - lat) * 111000
                 dist = int(math.sqrt(dx*dx + dy*dy))
                 rating = round(random.uniform(3.5, 5.0), 1)
                 reviews = random.randint(10, 500)
                 places.append({
-                    "name": name,
-                    "address": address,
-                    "distance": f"{dist} м",
-                    "lat": pl_lat,
-                    "lon": pl_lon,
-                    "emoji": get_place_emoji(name),
-                    "rating": rating,
-                    "reviews": reviews
+                    "name": name, "address": address, "distance": f"{dist} м",
+                    "lat": pl_lat, "lon": pl_lon, "emoji": get_place_emoji(name),
+                    "rating": rating, "reviews": reviews
                 })
-                if len(places) >= limit:
-                    break
-        print(f"📍 Найдено мест: {len(places)}")
+                if len(places) >= limit: break
         return places if places else None
-    except Exception as e:
-        print(f"❌ Ошибка 2GIS: {e}")
+    except:
         return None
 
 def ask_yandexgpt(question, user_lang_code="ru"):
@@ -283,27 +195,16 @@ def handle_pet(chat_id):
     taps = user_taps.get(chat_id, 0) + 1
     user_taps[chat_id] = taps if taps <= 3 else 1
     level = user_taps[chat_id]
-    
-    if level == 1:
-        video_id = ANIMATIONS["pet_level_1"]
-        hint = "🐺 Ещё разочек?"
-    elif level == 2:
-        video_id = ANIMATIONS["pet_level_2"]
-        hint = "🐺✨ Почти финал!"
-    else:
-        video_id = ANIMATIONS["pet_level_3"]
-        hint = "🌟 Ты настоящий друг!"
-    
-    send_video(chat_id, video_id)
-    send_message(chat_id, hint, get_pet_only_keyboard())
-    text_to_voice_yandex(hint, chat_id, user_lang.get(chat_id, "ru"))
+    videos = {
+        1: "BAACAgIAAxkBAAMFaeFg6muihgm2dc0AAZhiX_UsR2sJAALNlQACwHAJS27ieKZuet3qOwQ",
+        2: "BAACAgIAAxkBAAMHaeFhRkszZublu0HECvImrEEhjWsAAsuVAALAcAlLeZg8JivhF_I7BA",
+        3: "BAACAgIAAxkBAAMIaeFhu973hytPbGYEuen2OgcPYEcAAs-VAALAcAlLYK3Uk3Z4Ivs7BA"
+    }
+    hints = {1: "🐺 Ещё разочек?", 2: "🐺✨ Почти финал!", 3: "🌟 Ты настоящий друг!"}
+    send_video(chat_id, videos[level])
+    send_message(chat_id, hints[level], get_pet_only_keyboard())
 
 def send_welcome_and_places(chat_id, lat, lon):
-    # Отправляем новую анимацию (вместо зелёной галочки)
-    print("🎬 Отправляем новую анимацию...")
-    send_video(chat_id, ANIMATIONS["new_animation"])
-    time.sleep(0.5)
-    
     lang = user_lang.get(chat_id, "ru")
     address = get_address(lat, lon, lang)
     weather = get_weather(lat, lon, lang)
@@ -354,97 +255,65 @@ def send_welcome_and_places(chat_id, lat, lon):
     keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
     
     send_message(chat_id, full_msg, {"inline_keyboard": keyboard})
-    
-    voice_msg = welcome + location_block + weather_block
-    text_to_voice_yandex(voice_msg, chat_id, lang)
-
-def handle_text_message(chat_id, text):
-    send_random_thinking(chat_id)
-    lang = user_lang.get(chat_id, "ru")
-    answer = ask_yandexgpt(text, lang)
-    send_message(chat_id, answer, get_pet_only_keyboard())
-    text_to_voice_yandex(answer, chat_id, lang)
 
 def handle_message(message):
     chat_id = message["chat"]["id"]
     text = message.get("text", "")
     
     if text == "/start":
-        send_video(chat_id, ANIMATIONS["welcome"])
+        send_video(chat_id, "BAACAgIAAxkBAAMEaeFgf2cGLcUKtepNlq8U750S0FUAAs6VAALAcAlLsK2BDzM-K1M7BA")
         time.sleep(0.5)
         send_message(chat_id, "🌍 *Выберите язык / Select language / 选择语言:*", get_language_keyboard())
     elif text == "/pet":
         handle_pet(chat_id)
-    elif text.lower() in ["где я", "мой адрес", "where am i", "我的位置"]:
+    elif text.lower() in ["где я", "мой адрес"]:
         if chat_id in user_last_location:
             lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
-            answer = get_address(lat, lon, user_lang.get(chat_id, "ru"))
-            send_message(chat_id, f"📍 {answer}", get_pet_only_keyboard())
-            text_to_voice_yandex(answer, chat_id, user_lang.get(chat_id, "ru"))
+            send_message(chat_id, f"📍 {get_address(lat, lon)}", get_pet_only_keyboard())
         else:
-            if not user_has_location.get(chat_id, False):
-                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
-            else:
-                send_message(chat_id, "📍 Геопозиция не найдена. Отправьте геопозицию ещё раз.", get_location_reply_keyboard())
-    elif text.lower() in ["что рядом", "места рядом", "nearby places", "附近的地方"]:
+            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+    elif text.lower() in ["что рядом", "места рядом"]:
         if chat_id in user_last_location:
             lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
-            send_welcome_and_places(chat_id, lat, lon)
-        else:
-            if not user_has_location.get(chat_id, False):
-                send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
-                user_has_location[chat_id] = False
+            places = get_nearby_places_2gis(lat, lon)
+            if places:
+                send_welcome_and_places(chat_id, lat, lon)
             else:
-                send_message(chat_id, "📍 Геопозиция не найдена", get_pet_only_keyboard())
+                send_message(chat_id, "🏛 Не удалось найти места рядом", get_pet_only_keyboard())
+        else:
+            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
     else:
-        handle_text_message(chat_id, text)
+        send_video(chat_id, "BAACAgIAAxkBAAMCaeFdUzN5tNI4r_mKJW--H3KYSQQAArqfAAJFDQlLzyLg1y5Hj4I7BA")
+        answer = ask_yandexgpt(text, user_lang.get(chat_id, "ru"))
+        send_message(chat_id, answer, get_pet_only_keyboard())
 
 def handle_callback(chat_id, data, callback_id):
     try:
         requests.post(f"{BASE_URL}/answerCallbackQuery", json={"callback_query_id": callback_id})
     except:
         pass
-    
     if data.startswith("lang_"):
         lang = data.split("_")[1]
         user_lang[chat_id] = lang
-        
-        if lang == "ru":
-            msg = "✅ *Язык выбран: Русский*"
-        elif lang == "en":
-            msg = "✅ *Language selected: English*"
-        else:
-            msg = "✅ *语言已选择：中文*"
-        
-        send_message(chat_id, msg)
-        
-        if not user_has_location.get(chat_id, False):
-            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
-    
+        send_message(chat_id, f"✅ Язык выбран: {lang}")
+        send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
     elif data == "pet":
         handle_pet(chat_id)
 
 def handle_location(chat_id, lat, lon):
-    print(f"📍 Сохранение геопозиции для {chat_id}")
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
     user_has_location[chat_id] = True
     
-    # Удаляем клавиатуру (без анимации)
-    url = f"{BASE_URL}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": "✅",
-        "reply_markup": {"remove_keyboard": True}
-    }
-    try:
-        requests.post(url, json=payload, timeout=30)
-        print(f"🗑️ Клавиатура удалена для {chat_id}")
-    except Exception as e:
-        print(f"❌ Ошибка удаления клавиатуры: {e}")
+    # Отправляем НОВУЮ АНИМАЦИЮ (вместо зелёной галочки)
+    send_video(chat_id, "BAACAgIAAxkBAAMDaeFfUtg_F7b1gDHGLoe_Q2Zmy1IAAvKlAAKAEwhLGU5iRq6tWhA7BA")
+    time.sleep(0.5)
+    
+    # Удаляем клавиатуру
+    requests.post(f"{BASE_URL}/sendMessage", json={"chat_id": chat_id, "text": "✅", "reply_markup": {"remove_keyboard": True}})
     
     send_welcome_and_places(chat_id, lat, lon)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
-    print("🤖 DeVox запущен на Render с новыми анимациями!")
+    print("🤖 DeVox запущен с НОВОЙ анимацией!")
     app.run(host='0.0.0.0', port=port)
