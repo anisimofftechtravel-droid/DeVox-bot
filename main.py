@@ -186,31 +186,43 @@ def get_weather_by_city(city_name, day_offset=0, lang="ru"):
 def is_travel_related(question):
     question_lower = question.lower()
     
+    # Вопросы о самом боте
     devox_keywords = ["devox", "девокс", "кто ты", "что ты", "твоя задача", "помощник", "бот"]
     for keyword in devox_keywords:
         if keyword in question_lower:
             return True
     
+    # Еда и бронирование
+    food_booking_keywords = [
+        "поесть", "еда", "ресторан", "кафе", "кофейня", "бистро", "столовая",
+        "завтрак", "обед", "ужин", "перекус", "попробовать", "блюдо", "кухня",
+        "забронировать", "бронь", "столик", "заказать", "доставка", "что поесть",
+        "где поесть", "вкусно", "покушать"
+    ]
+    for keyword in food_booking_keywords:
+        if keyword in question_lower:
+            return True
+    
+    # Основные туристические темы
     travel_keywords = [
         "путешеств", "тур", "поездк", "город", "города", "городе", "столица", "страна", 
         "достопримечательност", "кремль", "собор", "музей", "парк", "пляж", "море", "горы",
         "отель", "гостиниц", "билет", "самолет", "поезд", "автобус", "экскурс",
-        "ресторан", "кафе", "кухн", "погода", "климат", "авиа", "жд", 
-        "концерт", "выставк", "фестивал", "театр", "кинотеатр",
-        "маршрут", "карт", "навигац", "виза", "паспорт", "валюта",
-        "трансфер", "аэропорт", "вокзал", "метро", "такси", "аренда",
-        "экскурсия", "гид", "сувенир", "шопинг", "рынок",
+        "погода", "климат", "авиа", "жд", "концерт", "выставк", "фестивал", "театр", "кинотеатр",
+        "маршрут", "карт", "навигац", "виза", "паспорт", "валюта", "трансфер", "аэропорт",
+        "вокзал", "метро", "такси", "аренда", "экскурсия", "гид", "сувенир", "шопинг", "рынок",
         "памятник", "церковь", "замок", "крепость", "природ", "озеро", "водопад",
         "где я", "мой адрес", "что рядом", "места рядом", "погладить волка", "pet",
         "расскажи про", "расскажи о", "что посмотреть", "что интересного",
-        "добраться", "как добраться", "дорога", "маршрут", "транспорт", "билеты на автобус",
-        "поездка", "на машине", "на автобусе", "на поезде", "на самолете", "такси"
+        "добраться", "как добраться", "дорога", "маршрут", "транспорт"
     ]
     for keyword in travel_keywords:
         if keyword in question_lower:
             return True
     
-    cities = ["москва", "питер", "спб", "сочи", "казань", "стамбул", "париж", "лондон", "берлин", "рим", "токио", "пекин", "прага", "варшава", "нью-йорк", "набережные челны", "челны"]
+    # Города
+    cities = ["москва", "питер", "спб", "сочи", "казань", "стамбул", "париж", "лондон", "берлин", 
+              "рим", "токио", "пекин", "прага", "варшава", "нью-йорк", "набережные челны", "челны"]
     for city in cities:
         if city in question_lower:
             return True
@@ -227,11 +239,11 @@ def ask_yandexgpt(question, user_lang_code="ru"):
             return "🌍 *抱歉，我只回答关于旅行、旅游、城市、景点、天气、机票、酒店、交通和活动的问题。*\n\n请提出与旅行相关的问题，例如：\n• 告诉我关于巴黎的事\n• 在伊斯坦布尔看什么？\n• 索契的天气怎么样？\n• 查找去莫斯科的机票\n• 如何从莫斯科到喀山？\n• 我在哪里？\n• 附近有什么？\n• 你是谁？（关于我的问题）"
     
     if user_lang_code == "ru":
-        system_prompt = "Ты — DeVox, помощник для путешествий с головой волка. Отвечай на русском языке кратко, используй эмодзи. Отвечай на вопросы о путешествиях, городах, достопримечательностях, культуре, географии, климате, транспорте, как добраться, билетах, отелях, погоде, мероприятиях. Если спрашивают о тебе — расскажи, что ты DeVox, голосовой помощник для путешествий. Твой характер — дружелюбный волк."
+        system_prompt = "Ты — DeVox, помощник для путешествий с головой волка. Отвечай на русском языке кратко, используй эмодзи. Отвечай на вопросы о путешествиях, городах, достопримечательностях, культуре, географии, климате, транспорте, как добраться, билетах, отелях, погоде, мероприятиях, а также о еде и ресторанах. Если спрашивают о тебе — расскажи, что ты DeVox, голосовой помощник для путешествий. Твой характер — дружелюбный волк."
     elif user_lang_code == "en":
-        system_prompt = "You are DeVox, a travel assistant with a wolf head. Answer in English briefly, use emojis. Answer questions about travel, cities, attractions, culture, geography, climate, transport, how to get, tickets, hotels, weather, events. If asked about yourself, tell that you are DeVox, a voice travel assistant. Your character is a friendly wolf."
+        system_prompt = "You are DeVox, a travel assistant with a wolf head. Answer in English briefly, use emojis. Answer questions about travel, cities, attractions, culture, geography, climate, transport, how to get, tickets, hotels, weather, events, and also about food and restaurants. If asked about yourself, tell that you are DeVox, a voice travel assistant. Your character is a friendly wolf."
     else:
-        system_prompt = "你是DeVox，一个长着狼头的旅行助手。用中文简短回答，使用表情符号。回答关于旅行、城市、景点、文化、地理、气候、交通、如何到达、机票、酒店、天气、活动的问题。如果问起你自己，告诉他们你是DeVox，一个语音旅行助手。你的性格是友好的狼。"
+        system_prompt = "你是DeVox，一个长着狼头的旅行助手。用中文简短回答，使用表情符号。回答关于旅行、城市、景点、文化、地理、气候、交通、如何到达、机票、酒店、天气、活动的问题，也包括关于食物和餐厅的问题。如果问起你自己，告诉他们你是DeVox，一个语音旅行助手。你的性格是友好的狼。"
     
     url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
     headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
@@ -247,6 +259,23 @@ def ask_yandexgpt(question, user_lang_code="ru"):
         return f"🤖 Ошибка AI"
     except:
         return f"🤖 Ошибка"
+
+def get_place_recommendation(place_name, lang="ru"):
+    """Генерирует короткую рекомендацию для места через YandexGPT"""
+    if lang == "ru":
+        prompt = f"Напиши очень короткую рекомендацию для туриста о месте '{place_name}'. Одно предложение, с эмодзи, без лишних слов. Например: '☕ Здесь варят лучший кофе в городе' или '🥐 Их плюшки тают во рту'."
+    elif lang == "en":
+        prompt = f"Write a very short recommendation for a tourist about '{place_name}'. One sentence with emoji. Example: '☕ They brew the best coffee in town' or '🥐 Their pastries melt in your mouth'."
+    else:
+        prompt = f"为游客写一条关于'{place_name}'的简短推荐。一句话，带表情符号。例如：'☕ 这里有全城最好的咖啡'或'🥐 他们的面包入口即化'。"
+    
+    answer = ask_yandexgpt(prompt, lang)
+    if not answer or len(answer) > 150 or "Ошибка" in answer:
+        if lang == "ru":
+            return "📍 Место заслуживает внимания!"
+        else:
+            return "📍 This place is worth checking out!"
+    return answer
 
 def get_weather_with_facts(city_name, day_offset=0, lang="ru"):
     weather = get_weather_by_city(city_name, day_offset, lang)
@@ -435,15 +464,15 @@ def get_weather_for_voice(lat, lon, lang="ru"):
 
 def get_place_emoji(name):
     nl = name.lower()
-    if "кафе" in nl: return "☕"
-    if "ресторан" in nl: return "🍽️"
-    if "музей" in nl: return "🏛️"
+    if "кафе" in nl or "кофейн" in nl: return "☕"
+    if "ресторан" in nl or "бистро" in nl: return "🍽️"
+    if "музей" in nl or "галерея" in nl: return "🏛️"
     if "аптека" in nl: return "💊"
     if "магазин" in nl: return "🛍️"
-    if "бар" in nl: return "🍺"
+    if "бар" in nl or "паб" in nl: return "🍺"
     return "📍"
 
-def get_nearby_places_2gis(lat, lon, radius=500, limit=10):
+def get_nearby_places_2gis(lat, lon, radius=500, limit=5):
     url = "https://catalog.api.2gis.ru/3.0/items"
     params = {
         "q": "кафе ресторан кофейня музей аптека магазин бар",
@@ -491,39 +520,44 @@ def handle_pet(chat_id):
     send_message(chat_id, hints[level], get_pet_only_keyboard())
     text_to_voice_yandex(hints[level], chat_id)
 
-def send_welcome_and_places(chat_id, lat, lon):
+def send_welcome_and_places(chat_id, lat, lon, custom_message=None):
     send_video(chat_id, ANIMATIONS["welcome_location"])
     time.sleep(0.5)
     lang = user_lang.get(chat_id, "ru")
     address = get_address(lat, lon, lang)
     weather_display = get_weather(lat, lon, lang)
     weather_voice = get_weather_for_voice(lat, lon, lang)
-    places = get_nearby_places_2gis(lat, lon)
+    places = get_nearby_places_2gis(lat, lon, radius=500, limit=5)
     
-    msg = f"🌟 *Добро пожаловать в DeVox!*\n\n📍 *Твоё местоположение:*\n{address}\n\n"
+    if custom_message:
+        msg = f"🌟 {custom_message}\n\n"
+    else:
+        msg = f"🌟 *Добро пожаловать в DeVox!*\n\n"
+    
+    msg += f"📍 *Твоё местоположение:*\n{address}\n\n"
     if weather_display:
         msg += f"🌤️ *Погода:* {weather_display}\n\n"
-    if places:
-        msg += f"🏛 *Ближайшие места:*\n\n"
-        for p in places:
-            msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n   📍 {p['address']}\n   ⭐ {p['rating']} ★ ({p['reviews']} отзывов)\n\n"
-    else:
-        msg += f"🏛 *Ближайшие места:*\nНе найдены\n"
     
-    keyboard = []
-    row = []
     if places:
+        msg += f"🍽️ *Где поесть рядом:*\n\n"
+        keyboard = []
         for p in places:
-            url = f"https://yandex.ru/maps/?rtext={lon},{lat}~{p['lon']},{p['lat']}&rtt=pd"
-            name = p['name'].split(',')[0][:18]
-            row.append({"text": f"{p['emoji']} {name}", "url": url})
-            if len(row) == 2:
-                keyboard.append(row)
-                row = []
-        if row:
-            keyboard.append(row)
-    keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
-    send_message(chat_id, msg, {"inline_keyboard": keyboard})
+            recommendation = get_place_recommendation(p['name'], lang)
+            msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n"
+            msg += f"   📍 {p['address']}\n"
+            msg += f"   💡 {recommendation}\n"
+            msg += f"   ⭐ {p['rating']} ★ ({p['reviews']} отзывов)\n\n"
+            
+            route_url = f"https://yandex.ru/maps/?rtext={lon},{lat}~{p['lon']},{p['lat']}&rtt=pd"
+            name_short = p['name'].split(',')[0][:18]
+            keyboard.append([{"text": f"🧭 {name_short}", "url": route_url}])
+            keyboard.append([{"text": f"📞 Забронировать {name_short}", "callback_data": f"booking_{p['name'][:20]}"}])
+        
+        keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
+        send_message(chat_id, msg, {"inline_keyboard": keyboard})
+    else:
+        msg += f"🍽️ *Где поесть рядом:*\nНе найдены\n\n"
+        send_message(chat_id, msg, get_pet_only_keyboard())
     
     voice_msg = f"Добро пожаловать в DeVox. Твоё местоположение: {address}. "
     if weather_voice:
@@ -536,6 +570,19 @@ def handle_text_message(chat_id, text):
     send_video(chat_id, ANIMATIONS["thinking"])
     lang = user_lang.get(chat_id, "ru")
     
+    food_keywords = ["поесть", "еда", "ресторан", "кафе", "кофейня", "где поесть", "что поесть", "покушать", "вкусно", "завтракать", "обедать", "ужинать"]
+    is_food_question = any(word in text.lower() for word in food_keywords)
+    
+    if is_food_question and chat_id in user_last_location:
+        lat = user_last_location[chat_id]["lat"]
+        lon = user_last_location[chat_id]["lon"]
+        send_welcome_and_places(chat_id, lat, lon, custom_message="🍽️ *Вот что я нашёл для тебя:*")
+        return
+    
+    if is_food_question:
+        send_message(chat_id, "📍 *Чтобы я нашёл места, где можно поесть, отправь мне свою геопозицию.*\n\nНажми на кнопку ниже, чтобы поделиться местоположением.", get_location_reply_keyboard())
+        return
+    
     city, day_offset = extract_city_and_day_from_text(text)
     weather_keywords = ["погод", "weather", "температур", "temp", "градус", "солнеч", "дожд", "ветер", "облач", "пасмур", "ясно", "мороз", "тепл", "холод", "завтра", "сегодня", "сейчас", "неделя"]
     is_weather = any(word in text.lower() for word in weather_keywords)
@@ -543,7 +590,6 @@ def handle_text_message(chat_id, text):
     if city and is_weather:
         answer, weather, fact, day_text = get_weather_with_facts(city, day_offset, lang)
         send_message(chat_id, answer, get_pet_only_keyboard())
-        
         if weather and fact:
             voice_full = get_weather_for_voice_by_city(weather, fact, day_text, lang)
             text_to_voice_yandex(voice_full, chat_id, lang)
@@ -585,6 +631,7 @@ def handle_callback(chat_id, data, callback_id):
         requests.post(f"{BASE_URL}/answerCallbackQuery", json={"callback_query_id": callback_id})
     except:
         pass
+    
     if data.startswith("lang_"):
         lang = data.split("_")[1]
         user_lang[chat_id] = lang
@@ -596,6 +643,11 @@ def handle_callback(chat_id, data, callback_id):
             lang_name = "中文"
         send_message(chat_id, f"✅ *Язык выбран: {lang_name}*")
         send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+    
+    elif data.startswith("booking_"):
+        place_name = data.replace("booking_", "")
+        send_message(chat_id, f"📞 *Бронирование в «{place_name}»*\n\n🔧 Функция бронирования в разработке. Скоро здесь можно будет забронировать столик прямо через DeVox!\n\nПока что вы можете построить маршрут до места.", get_pet_only_keyboard())
+    
     elif data == "pet":
         handle_pet(chat_id)
 
@@ -640,7 +692,9 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
-    print("✅ Бот отвечает на вопросы о путешествиях, транспорте и о себе")
+    print("✅ Бот отвечает на вопросы о путешествиях, транспорте, еде и о себе")
     print("✅ Погода на сегодня, завтра, послезавтра и неделю")
+    print("✅ Рекомендации мест с AI-подсказками")
+    print("✅ Кнопки маршрута и бронирования")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
