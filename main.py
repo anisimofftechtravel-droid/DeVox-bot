@@ -229,11 +229,11 @@ def is_travel_related(question):
 def ask_yandexgpt(question, user_lang_code="ru"):
     if not is_travel_related(question):
         if user_lang_code == "ru":
-            return "🌍 *Извините, я отвечаю только на вопросы о путешествиях, туризме, городах, достопримечательностях, погоде, билетах, отелях, транспорте, мероприятиях и еде.*\n\nЗадайте вопрос, связанный с путешествиями, например:\n• Расскажи о Париже\n• Что посмотреть в Стамбуле?\n• Какая погода в Сочи?\n• Где поесть в Питере?\n• Как добраться из Москвы в Казань?\n• Что происходит в Санкт-Петербурге?\n• Где я?\n• Что рядом?\n• Кто ты? (вопрос обо мне)"
+            return "🌍 *Извините, я отвечаю только на вопросы о путешествиях, туризме, городах, достопримечательностях, погоде, билетах, отелях, транспорте, мероприятиях и еде.*\n\nЗадайте вопрос, связанный с путешествиями, например:\n• Расскажи о Париже\n• Что посмотреть в Стамбуле?\n• Какая погода в Сочи?\n• Где поесть в Москве?\n• Как добраться из Москвы в Казань?\n• Что происходит в Санкт-Петербурге?\n• Где я?\n• Что рядом?\n• Кто ты? (вопрос обо мне)"
         elif user_lang_code == "en":
-            return "🌍 *Sorry, I only answer questions about travel, tourism, cities, attractions, weather, tickets, hotels, transport, events and food.*\n\nAsk a travel-related question, for example:\n• Tell me about Paris\n• What to see in Istanbul?\n• What's the weather in Sochi?\n• Where to eat in St. Petersburg?\n• How to get from Moscow to Kazan?\n• Where am I?\n• What's nearby?\n• Who are you? (questions about me)"
+            return "🌍 *Sorry, I only answer questions about travel, tourism, cities, attractions, weather, tickets, hotels, transport, events and food.*\n\nAsk a travel-related question, for example:\n• Tell me about Paris\n• What to see in Istanbul?\n• What's the weather in Sochi?\n• Where to eat in Moscow?\n• How to get from Moscow to Kazan?\n• Where am I?\n• What's nearby?\n• Who are you? (questions about me)"
         else:
-            return "🌍 *抱歉，我只回答关于旅行、旅游、城市、景点、天气、机票、酒店、交通、活动和食物的问题。*\n\n请提出与旅行相关的问题，例如：\n• 告诉我关于巴黎的事\n• 在伊斯坦布尔看什么？\n• 索契的天气怎么样？\n• 在圣彼得堡哪里吃饭？\n• 如何从莫斯科到喀山？\n• 我在哪里？\n• 附近有什么？\n• 你是谁？（关于我的问题）"
+            return "🌍 *抱歉，我只回答关于旅行、旅游、城市、景点、天气、机票、酒店、交通、活动和食物的问题。*\n\n请提出与旅行相关的问题，例如：\n• 告诉我关于巴黎的事\n• 在伊斯坦布尔看什么？\n• 索契的天气怎么样？\n• 在莫斯科哪里吃饭？\n• 如何从莫斯科到喀山？\n• 我在哪里？\n• 附近有什么？\n• 你是谁？（关于我的问题）"
     
     if user_lang_code == "ru":
         system_prompt = "Ты — DeVox, помощник для путешествий с головой волка. Отвечай на русском языке кратко, используй эмодзи. Отвечай на вопросы о путешествиях, городах, достопримечательностях, культуре, географии, климате, транспорте, как добраться, билетах, отелях, погоде, мероприятиях, а также о еде и ресторанах. Если спрашивают о тебе — расскажи, что ты DeVox, голосовой помощник для путешествий. Твой характер — дружелюбный волк."
@@ -506,6 +506,108 @@ def get_nearby_places_2gis(lat, lon, radius=500, limit=5):
     except:
         return None
 
+def extract_city_from_food_question(text):
+    text_lower = text.lower()
+    
+    cities = {
+        "москва": ["москва", "москве", "мск", "москвы", "москву"],
+        "санкт-петербург": ["санкт-петербург", "питер", "спб", "петербург", "санкт петербург"],
+        "сочи": ["сочи"],
+        "казань": ["казань", "казани"],
+        "екатеринбург": ["екатеринбург", "екб"],
+        "новосибирск": ["новосибирск"],
+        "владивосток": ["владивосток"],
+        "калининград": ["калининград"],
+        "стамбул": ["стамбул", "истанбул"],
+        "париж": ["париж", "париже"],
+        "лондон": ["лондон", "лондоне"],
+        "нью-йорк": ["нью-йорк", "нью йорк"],
+        "берлин": ["берлин"],
+        "рим": ["рим"],
+        "токио": ["токио"],
+        "пекин": ["пекин"],
+        "прага": ["прага"],
+        "варшава": ["варшава"]
+    }
+    
+    for city, variants in cities.items():
+        for variant in variants:
+            if variant in text_lower:
+                return city
+    
+    return None
+
+def get_city_coords(city_name):
+    city_coords = {
+        "москва": (55.7558, 37.6173),
+        "санкт-петербург": (59.9343, 30.3351),
+        "сочи": (43.5855, 39.7231),
+        "казань": (55.7887, 49.1221),
+        "екатеринбург": (56.8389, 60.6057),
+        "новосибирск": (55.0084, 82.9357),
+        "владивосток": (43.1155, 131.8855),
+        "калининград": (54.7104, 20.4522),
+        "стамбул": (41.0082, 28.9784),
+        "париж": (48.8566, 2.3522),
+        "лондон": (51.5074, -0.1278),
+        "нью-йорк": (40.7128, -74.0060),
+        "берлин": (52.5200, 13.4050),
+        "рим": (41.9028, 12.4964),
+        "токио": (35.6895, 139.6917),
+        "пекин": (39.9042, 116.4074),
+        "прага": (50.0755, 14.4378),
+        "варшава": (52.2297, 21.0122)
+    }
+    return city_coords.get(city_name, (None, None))
+
+def send_food_places_by_city(chat_id, lat, lon, city_name, lang):
+    send_video(chat_id, ANIMATIONS["welcome_location"])
+    time.sleep(0.5)
+    
+    address = get_address(lat, lon, lang)
+    places = get_nearby_places_2gis(lat, lon, radius=500, limit=5)
+    
+    city_display = city_name.capitalize()
+    if city_name == "санкт-петербург":
+        city_display = "Санкт-Петербург"
+    
+    msg = f"🍽️ *DeVox нашёл для тебя места, где можно вкусно поесть в {city_display}!*\n\n"
+    msg += f"📍 *Центр города:*\n{address}\n\n"
+    
+    if places:
+        msg += f"🍽️ *Куда пойдём? Нажимай и бронируй:*\n\n"
+        
+        keyboard = []
+        row = []
+        for p in places:
+            recommendation = get_place_recommendation(p['name'], lang)
+            msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n"
+            msg += f"   📍 {p['address']}\n"
+            msg += f"   💡 {recommendation}\n"
+            msg += f"   ⭐ {p['rating']} ★ ({p['reviews']} отзывов)\n\n"
+            
+            route_url = f"https://yandex.ru/maps/?rtext={lon},{lat}~{p['lon']},{p['lat']}&rtt=pd"
+            name_short = p['name'].split(',')[0][:15]
+            
+            row.append({"text": f"🧭 {name_short}", "url": route_url})
+            row.append({"text": f"📞 Забронировать", "callback_data": f"booking_{p['name'][:20]}"})
+            
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        
+        if row:
+            keyboard.append(row)
+        
+        keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
+        send_message(chat_id, msg, {"inline_keyboard": keyboard})
+    else:
+        msg += f"🍽️ *Места рядом:*\nНе найдены\n\n"
+        send_message(chat_id, msg, get_pet_only_keyboard())
+    
+    voice_msg = f"DeVox нашёл для тебя места, где можно поесть в городе {city_display}. "
+    text_to_voice_yandex(voice_msg, chat_id, lang)
+
 def handle_pet(chat_id):
     taps = user_taps.get(chat_id, 0) + 1
     user_taps[chat_id] = taps if taps <= 3 else 1
@@ -585,16 +687,28 @@ def handle_text_message(chat_id, text):
     food_keywords = ["поесть", "еда", "ресторан", "кафе", "кофейня", "где поесть", "что поесть", "покушать", "вкусно", "завтракать", "обедать", "ужинать"]
     is_food_question = any(word in text.lower() for word in food_keywords)
     
-    if is_food_question and chat_id in user_last_location:
-        lat = user_last_location[chat_id]["lat"]
-        lon = user_last_location[chat_id]["lon"]
-        send_welcome_and_places(chat_id, lat, lon, is_food_request=True)
-        return
-    
     if is_food_question:
-        user_pending_food_request[chat_id] = True
-        send_message(chat_id, "🍽️ *Чтобы я нашёл места, где можно поесть, отправь мне свою геопозицию.*\n\nНажми на кнопку ниже, чтобы поделиться местоположением.", get_location_reply_keyboard())
-        return
+        target_city = extract_city_from_food_question(text)
+        
+        if target_city:
+            lat, lon = get_city_coords(target_city)
+            if lat and lon:
+                send_food_places_by_city(chat_id, lat, lon, target_city, lang)
+                return
+            else:
+                send_message(chat_id, f"🌍 *{target_city.capitalize()}*\n\n🗺️ Скоро я смогу показывать места и в этом городе. А пока попробуй спросить про Москву, Питер или Сочи.", get_pet_only_keyboard())
+                return
+        
+        elif chat_id in user_last_location:
+            lat = user_last_location[chat_id]["lat"]
+            lon = user_last_location[chat_id]["lon"]
+            send_welcome_and_places(chat_id, lat, lon, is_food_request=True)
+            return
+        
+        else:
+            user_pending_food_request[chat_id] = True
+            send_message(chat_id, "🍽️ *Чтобы я нашёл места, где можно поесть, отправь мне свою геопозицию или напиши город.*\n\nНапример: «Что поесть в Москве?»\n\nИли нажми на кнопку ниже, чтобы поделиться местоположением.", get_location_reply_keyboard())
+            return
     
     city, day_offset = extract_city_and_day_from_text(text)
     weather_keywords = ["погод", "weather", "температур", "temp", "градус", "солнеч", "дожд", "ветер", "облач", "пасмур", "ясно", "мороз", "тепл", "холод", "завтра", "сегодня", "сейчас", "неделя"]
@@ -715,5 +829,6 @@ if __name__ == "__main__":
     print("✅ Рекомендации мест с AI-подсказками")
     print("✅ Кнопки маршрута и бронирования (таблица)")
     print("✅ Разные сообщения для первого запуска и запроса еды")
+    print("✅ Поиск мест по конкретному городу (например, «Что поесть в Москве?»)")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
