@@ -3,6 +3,7 @@ import time
 import math
 import random
 import re
+import json
 from datetime import datetime, timedelta
 from flask import Flask, request
 import os
@@ -32,6 +33,33 @@ ANIMATIONS = {
 
 app = Flask(__name__)
 
+# ========== ФУНКЦИИ СОХРАНЕНИЯ ЛОКАЦИИ ==========
+def save_user_location(chat_id, lat, lon):
+    try:
+        locations = {}
+        if os.path.exists("user_locations.json"):
+            with open("user_locations.json", "r", encoding="utf-8") as f:
+                locations = json.load(f)
+        locations[str(chat_id)] = {"lat": lat, "lon": lon}
+        with open("user_locations.json", "w", encoding="utf-8") as f:
+            json.dump(locations, f, ensure_ascii=False, indent=2)
+        return True
+    except:
+        return False
+
+def load_user_location(chat_id):
+    try:
+        if os.path.exists("user_locations.json"):
+            with open("user_locations.json", "r", encoding="utf-8") as f:
+                locations = json.load(f)
+            data = locations.get(str(chat_id))
+            if data:
+                return {"lat": data["lat"], "lon": data["lon"]}
+    except:
+        pass
+    return None
+
+# ========== ОСНОВНЫЕ ФУНКЦИИ БОТА ==========
 def send_message(chat_id, text, reply_markup=None, parse_mode="MarkdownV2"):
     url = f"{BASE_URL}/sendMessage"
     if parse_mode == "MarkdownV2":
@@ -51,8 +79,6 @@ def send_video(chat_id, video_id):
     payload = {"chat_id": chat_id, "video": video_id}
     try:
         response = requests.post(url, json=payload, timeout=30)
-        if response.status_code == 200:
-            print("✅ Видео отправлено")
         return response
     except:
         return None
@@ -96,6 +122,13 @@ def get_location_reply_keyboard():
 
 def get_pet_only_keyboard():
     return {"inline_keyboard": [[{"text": "🐺 Погладить волка", "callback_data": "pet"}]]}
+
+def get_main_menu_keyboard():
+    return {"inline_keyboard": [
+        [{"text": "🍽️ Где поесть", "callback_data": "find_food"}],
+        [{"text": "🐺 Погладить волка", "callback_data": "pet"}],
+        [{"text": "📍 Где я?", "callback_data": "where_am_i"}]
+    ]}
 
 def get_address(lat, lon, lang="ru"):
     url = "https://geocode-maps.yandex.ru/1.x/"
@@ -527,7 +560,8 @@ def extract_city_from_food_question(text):
         "токио": ["токио"],
         "пекин": ["пекин"],
         "прага": ["прага"],
-        "варшава": ["варшава"]
+        "варшава": ["варшава"],
+        "набережные челны": ["набережные челны", "челны", "набережных челнах"]
     }
     
     for city, variants in cities.items():
@@ -556,9 +590,54 @@ def get_city_coords(city_name):
         "токио": (35.6895, 139.6917),
         "пекин": (39.9042, 116.4074),
         "прага": (50.0755, 14.4378),
-        "варшава": (52.2297, 21.0122)
+        "варшава": (52.2297, 21.0122),
+        "набережные челны": (55.7436, 52.3958)
     }
-    return city_coords.get(city_name, (None, None))
+    return city_coords.get(city_name.lower(), (None, None))
+
+def get_city_food_recommendation(city_name, lat, lon, lang="ru"):
+    """Универсальная функция для еды в ЛЮБОМ городе"""
+    places = get_nearby_places_2gis(lat, lon, radius=1000, limit=5)
+    
+    if lang == "ru":
+        msg = f"🍽️ *Где поесть в {city_name.capitalize()}?*\n\n"
+        msg += "📍 DeVox нашёл для вас лучшие заведения:\n\n"
+    else:
+        msg = f"🍽️ *Where to eat in {city_name.capitalize()}?*\n\n"
+        msg += "📍 DeVox found the best places:\n\n"
+    
+    keyboard = []
+    
+    if places:
+        for p in places[:5]:
+            rec = get_place_recommendation(p['name'], lang)
+            msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n"
+            msg += f"   📍 {p['address']}\n"
+            msg += f"   💡 {rec}\n"
+            if 'rating' in p:
+                msg += f"   ⭐ {p['rating']} ★\n"
+            msg += "\n"
+            
+            route_url = f"https://yandex.ru/maps/?rtext={lon},{lat}~{p['lon']},{p['lat']}&rtt=pd"
+            name_short = p['name'].split(',')[0][:15]
+            keyboard.append([{"text": f"🧭 {name_short}", "url": route_url}])
+    else:
+        if lang == "ru":
+            msg += "🍽️ *Популярные места:*\n"
+            msg += "• 🥟 Местная кухня\n"
+            msg += "• ☕ Кофейни\n"
+            msg += "• 🍔 Фастфуд\n\n"
+        else:
+            msg += "🍽️ *Popular places:*\n"
+            msg += "• 🥟 Local cuisine\n"
+            msg += "• ☕ Coffee shops\n"
+            msg += "• 🍔 Fast food\n\n"
+    
+    keyboard.append([{"text": f"🎫 Купить билет в {city_name.capitalize()}", "callback_data": f"ticket_{city_name}"}])
+    keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
+    keyboard.append([{"text": "🔙 В главное меню", "callback_data": "back_to_menu"}])
+    
+    return msg, {"inline_keyboard": keyboard}
 
 def send_food_places_by_city(chat_id, lat, lon, city_name, lang):
     send_video(chat_id, ANIMATIONS["welcome_location"])
@@ -681,11 +760,29 @@ def send_welcome_and_places(chat_id, lat, lon, is_food_request=False):
     text_to_voice_yandex(voice_msg, chat_id, lang)
 
 def handle_text_message(chat_id, text):
-    send_video(chat_id, ANIMATIONS["thinking"])
-    lang = user_lang.get(chat_id, "ru")
+    # Убираем квадрат загрузки - НЕ ОТПРАВЛЯЕМ ВИДЕО
+    # send_video(chat_id, ANIMATIONS["thinking"])  # ЗАКОММЕНТИРОВАНО
     
-    food_keywords = ["поесть", "еда", "ресторан", "кафе", "кофейня", "где поесть", "что поесть", "покушать", "вкусно", "завтракать", "обедать", "ужинать"]
-    is_food_question = any(word in text.lower() for word in food_keywords)
+    lang = user_lang.get(chat_id, "ru")
+    text_lower = text.lower()
+    
+    # Проверяем, спрашивают ли про еду в конкретном городе
+    match = re.search(r'(?:что|где|куда)\s+поесть\s+в\s+([а-яА-Яa-zA-Z\s\-]+)', text_lower)
+    if match:
+        city_name = match.group(1).strip()
+        lat, lon = get_city_coords(city_name)
+        if lat and lon:
+            msg, keyboard = get_city_food_recommendation(city_name, lat, lon, lang)
+            send_message(chat_id, msg, keyboard)
+            text_to_voice_yandex(f"Рассказываю, где можно поесть в городе {city_name}.", chat_id, lang)
+            return
+        else:
+            send_message(chat_id, f"🌍 *{city_name.capitalize()}*\n\n🗺️ Я ещё не добавил этот город в базу, но скоро добавлю! А пока попробуйте спросить про Москву, Питер или Сочи.", get_pet_only_keyboard())
+            return
+    
+    # Проверка на запрос еды (без указания города)
+    food_keywords = ["поесть", "еда", "ресторан", "кафе", "кофейня", "где поесть", "что поесть", "покушать", "вкусно"]
+    is_food_question = any(word in text_lower for word in food_keywords)
     
     if is_food_question:
         target_city = extract_city_from_food_question(text)
@@ -707,12 +804,13 @@ def handle_text_message(chat_id, text):
         
         else:
             user_pending_food_request[chat_id] = True
-            send_message(chat_id, "🍽️ *Чтобы я нашёл места, где можно поесть, отправь мне свою геопозицию или напиши город.*\n\nНапример: «Что поесть в Москве?»\n\nИли нажми на кнопку ниже, чтобы поделиться местоположением.", get_location_reply_keyboard())
+            send_message(chat_id, "🍽️ *Чтобы я нашёл места, где можно поесть, отправь мне свою геопозицию или напиши город.*\n\nНапример: «Что поесть в Москве?» или «Где поесть в Париже?»", get_location_reply_keyboard())
             return
     
+    # Обработка погоды
     city, day_offset = extract_city_and_day_from_text(text)
-    weather_keywords = ["погод", "weather", "температур", "temp", "градус", "солнеч", "дожд", "ветер", "облач", "пасмур", "ясно", "мороз", "тепл", "холод", "завтра", "сегодня", "сейчас", "неделя"]
-    is_weather = any(word in text.lower() for word in weather_keywords)
+    weather_keywords = ["погод", "weather", "температур", "градус", "солнеч", "дожд", "ветер", "облач", "пасмур", "ясно", "мороз", "тепл", "холод", "завтра", "сегодня", "сейчас", "неделя"]
+    is_weather = any(word in text_lower for word in weather_keywords)
     
     if city and is_weather:
         answer, weather, fact, day_text = get_weather_with_facts(city, day_offset, lang)
@@ -730,26 +828,41 @@ def handle_text_message(chat_id, text):
 def handle_message(message):
     chat_id = message["chat"]["id"]
     text = message.get("text", "")
+    
     if text == "/start":
         send_video(chat_id, ANIMATIONS["welcome_start"])
         time.sleep(0.5)
-        send_message(chat_id, "🌍 *Выберите язык / Select language / 选择语言:*", get_language_keyboard())
+        send_message(chat_id, "🌍 *Добро пожаловать в DeVox!*\n\nВыберите язык / Select language / 选择语言:", get_language_keyboard())
+    
+    elif text == "/menu":
+        send_message(chat_id, "📱 *Главное меню:*", get_main_menu_keyboard())
+    
     elif text == "/pet":
         handle_pet(chat_id)
+    
     elif text.lower() in ["где я", "мой адрес", "where am i", "我的位置"]:
-        if chat_id in user_last_location:
+        saved_loc = load_user_location(chat_id)
+        if saved_loc:
+            address = get_address(saved_loc["lat"], saved_loc["lon"], user_lang.get(chat_id, "ru"))
+            send_message(chat_id, f"📍 *Ваше местоположение:*\n{address}", get_main_menu_keyboard())
+            text_to_voice_yandex(address, chat_id)
+        elif chat_id in user_last_location:
             lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
-            answer = get_address(lat, lon, user_lang.get(chat_id, "ru"))
-            send_message(chat_id, f"📍 {answer}", get_pet_only_keyboard())
-            text_to_voice_yandex(answer, chat_id)
+            address = get_address(lat, lon, user_lang.get(chat_id, "ru"))
+            send_message(chat_id, f"📍 *Ваше местоположение:*\n{address}", get_main_menu_keyboard())
+            text_to_voice_yandex(address, chat_id)
         else:
-            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+            send_message(chat_id, "📍 *Локация не найдена*\n\nОтправьте геопозицию один раз, и я запомню её.", get_location_reply_keyboard())
+    
     elif text.lower() in ["что рядом", "места рядом", "nearby places", "附近的地方"]:
-        if chat_id in user_last_location:
+        saved_loc = load_user_location(chat_id)
+        if saved_loc:
+            send_welcome_and_places(chat_id, saved_loc["lat"], saved_loc["lon"], is_food_request=False)
+        elif chat_id in user_last_location:
             lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
             send_welcome_and_places(chat_id, lat, lon, is_food_request=False)
         else:
-            send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+            send_message(chat_id, "📍 *Отправьте геопозицию*, чтобы я показал места рядом.", get_location_reply_keyboard())
     else:
         handle_text_message(chat_id, text)
 
@@ -769,7 +882,62 @@ def handle_callback(chat_id, data, callback_id):
         else:
             lang_name = "中文"
         send_message(chat_id, f"✅ *Язык выбран: {lang_name}*")
-        send_message(chat_id, "📍 Отправь геопозицию", get_location_reply_keyboard())
+        send_message(chat_id, "📍 Отправьте геопозицию один раз, и я запомню её навсегда!", get_location_reply_keyboard())
+    
+    elif data.startswith("ticket_"):
+        city_name = data.replace("ticket_", "")
+        lang = user_lang.get(chat_id, "ru")
+        if lang == "ru":
+            msg = f"🎫 *Билет в {city_name.capitalize()}*\n\n🚀 *Тестовый режим!*\n\nВ ближайшее время здесь появится возможность купить реальные билеты.\n\n💰 *Примерная стоимость:* от 5000₽ (в одну сторону)\n\n✨ А пока я могу рассказать вам больше о городе или показать другие направления!"
+        else:
+            msg = f"🎫 *Ticket to {city_name.capitalize()}*\n\n🚀 *Test mode!*\n\nSoon you will be able to buy real tickets here.\n\n✨ In the meantime, I can tell you more about the city or show other destinations!"
+        
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "🍽️ Ещё заведения", "callback_data": f"more_food_{city_name}"}],
+                [{"text": "🐺 Погладить волка", "callback_data": "pet"}],
+                [{"text": "🔙 В главное меню", "callback_data": "back_to_menu"}]
+            ]
+        }
+        send_message(chat_id, msg, keyboard)
+    
+    elif data.startswith("more_food_"):
+        city_name = data.replace("more_food_", "")
+        lang = user_lang.get(chat_id, "ru")
+        lat, lon = get_city_coords(city_name)
+        if lat and lon:
+            msg, keyboard = get_city_food_recommendation(city_name, lat, lon, lang)
+            send_message(chat_id, msg, keyboard)
+        else:
+            send_message(chat_id, f"🌍 Извините, город {city_name} временно недоступен.", get_pet_only_keyboard())
+    
+    elif data == "back_to_menu":
+        send_message(chat_id, "📱 *Главное меню:*", get_main_menu_keyboard())
+    
+    elif data == "find_food":
+        saved_loc = load_user_location(chat_id)
+        if saved_loc:
+            send_welcome_and_places(chat_id, saved_loc["lat"], saved_loc["lon"], is_food_request=True)
+        elif chat_id in user_last_location:
+            lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
+            send_welcome_and_places(chat_id, lat, lon, is_food_request=True)
+        else:
+            user_pending_food_request[chat_id] = True
+            send_message(chat_id, "🍽️ *Чтобы найти места, где поесть, отправьте геопозицию.*", get_location_reply_keyboard())
+    
+    elif data == "where_am_i":
+        saved_loc = load_user_location(chat_id)
+        if saved_loc:
+            address = get_address(saved_loc["lat"], saved_loc["lon"], user_lang.get(chat_id, "ru"))
+            send_message(chat_id, f"📍 *Ваше местоположение:*\n{address}", get_main_menu_keyboard())
+            text_to_voice_yandex(address, chat_id)
+        elif chat_id in user_last_location:
+            lat, lon = user_last_location[chat_id]["lat"], user_last_location[chat_id]["lon"]
+            address = get_address(lat, lon, user_lang.get(chat_id, "ru"))
+            send_message(chat_id, f"📍 *Ваше местоположение:*\n{address}", get_main_menu_keyboard())
+            text_to_voice_yandex(address, chat_id)
+        else:
+            send_message(chat_id, "📍 *Локация не найдена*\n\nОтправьте геопозицию один раз, и я запомню её.", get_location_reply_keyboard())
     
     elif data.startswith("booking_"):
         place_name = data.replace("booking_", "")
@@ -780,13 +948,21 @@ def handle_callback(chat_id, data, callback_id):
 
 def handle_location(chat_id, lat, lon):
     user_last_location[chat_id] = {"lat": lat, "lon": lon}
+    save_user_location(chat_id, lat, lon)
     user_has_location[chat_id] = True
     
     is_food_request = chat_id in user_pending_food_request
     if is_food_request:
         del user_pending_food_request[chat_id]
     
-    requests.post(f"{BASE_URL}/sendMessage", json={"chat_id": chat_id, "text": "", "reply_markup": {"remove_keyboard": True}})
+    # Убираем клавиатуру с геопозицией
+    requests.post(f"{BASE_URL}/sendMessage", json={
+        "chat_id": chat_id,
+        "text": "✅ *Локация сохранена!*",
+        "reply_markup": {"remove_keyboard": True}
+    })
+    
+    time.sleep(0.5)
     send_welcome_and_places(chat_id, lat, lon, is_food_request)
 
 @app.route('/')
@@ -827,8 +1003,9 @@ if __name__ == "__main__":
     print("✅ Бот отвечает на вопросы о путешествиях, транспорте, еде и о себе")
     print("✅ Погода на сегодня, завтра, послезавтра и неделю")
     print("✅ Рекомендации мест с AI-подсказками")
-    print("✅ Кнопки маршрута и бронирования (таблица)")
-    print("✅ Разные сообщения для первого запуска и запроса еды")
-    print("✅ Поиск мест по конкретному городу (например, «Что поесть в Москве?»)")
+    print("✅ Кнопки маршрута и бронирования")
+    print("✅ Сохранение локации в файл")
+    print("✅ Универсальный поиск еды: 'Что поесть в [любой город]'")
+    print("✅ Кнопка 'Купить билет' (тестовый режим)")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
