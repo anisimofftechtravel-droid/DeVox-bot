@@ -115,18 +115,24 @@ def get_address(lat, lon, lang="ru"):
 
 def get_weather_by_city(city_name, day_offset=0, lang="ru"):
     try:
-        url = f"https://wttr.in/{city_name}?format=j1&lang={lang}"
+        url = f"https://wttr.in/{city_name}?format=j1&lang={lang}&m"
         response = requests.get(url, timeout=10)
+        response.encoding = 'utf-8'
+        
         if response.status_code != 200:
             return None
+        
         data = response.json()
         
         if day_offset == 0:
             current = data.get("current_condition", [{}])[0]
             temp = current.get("temp_C", "?")
             weather_desc = current.get("lang_ru", [{}])[0].get("value", "")
-            if not weather_desc:
+            if not weather_desc or "?" in weather_desc:
                 weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
+            if not weather_desc:
+                weather_desc = "данные не получены"
+            weather_desc = re.sub(r'[^\w\sа-яА-Яa-zA-Z\- ]', '', weather_desc)
             wind_speed = current.get("windspeedKmph", "?")
             humidity = current.get("humidity", "?")
             weather_code = current.get("weatherCode", "0")
@@ -141,6 +147,7 @@ def get_weather_by_city(city_name, day_offset=0, lang="ru"):
                     weather_desc = mid_hour.get("lang_ru", [{}])[0].get("value", "")
                     if not weather_desc:
                         weather_desc = mid_hour.get("weatherDesc", [{}])[0].get("value", "")
+                    weather_desc = re.sub(r'[^\w\sа-яА-Яa-zA-Z\- ]', '', weather_desc)
                     wind_speed = mid_hour.get("windspeedKmph", "?")
                     humidity = mid_hour.get("humidity", "?")
                     weather_code = mid_hour.get("weatherCode", "0")
@@ -155,7 +162,13 @@ def get_weather_by_city(city_name, day_offset=0, lang="ru"):
             "200": "⛈️", "227": "🌨️", "230": "🌨️", "248": "🌫️",
             "260": "🌫️", "263": "🌧️", "266": "🌧️", "281": "🌧️",
             "284": "🌧️", "293": "🌧️", "296": "🌧️", "299": "🌧️",
-            "302": "🌧️", "305": "🌧️", "308": "🌧️"
+            "302": "🌧️", "305": "🌧️", "308": "🌧️", "311": "🌧️",
+            "314": "🌧️", "317": "🌧️", "320": "🌨️", "323": "🌨️",
+            "326": "🌨️", "329": "🌨️", "332": "🌨️", "335": "🌨️",
+            "338": "🌨️", "350": "🌧️", "353": "🌧️", "356": "🌧️",
+            "359": "🌧️", "362": "🌧️", "365": "🌧️", "368": "🌨️",
+            "371": "🌨️", "374": "🌨️", "377": "🌨️", "386": "⛈️",
+            "389": "⛈️", "392": "⛈️", "395": "🌨️"
         }
         emoji = weather_emoji.get(weather_code, "🌡️")
         
@@ -166,13 +179,13 @@ def get_weather_by_city(city_name, day_offset=0, lang="ru"):
             "wind": wind_speed,
             "humidity": humidity
         }
-    except:
+    except Exception as e:
+        print(f"❌ Ошибка погоды: {e}")
         return None
 
 def is_travel_related(question):
     question_lower = question.lower()
     
-    # Вопросы о самом боте всегда разрешены
     devox_keywords = ["devox", "девокс", "кто ты", "что ты", "твоя задача", "помощник", "бот"]
     for keyword in devox_keywords:
         if keyword in question_lower:
@@ -237,14 +250,21 @@ def ask_yandexgpt(question, user_lang_code="ru"):
 
 def get_weather_with_facts(city_name, day_offset=0, lang="ru"):
     weather = get_weather_by_city(city_name, day_offset, lang)
+    
     if not weather:
         if lang == "ru":
-            return f"🌍 *{city_name.capitalize()}*\n\n❌ Не удалось получить данные о погоде. Проверьте название города.\n\n🗺️ Попробуйте другой город, например: Москва, Сочи, Стамбул, Нью-Йорк.", None, None
+            return f"🌍 *{city_name.capitalize()}*\n\n❌ Не удалось получить данные о погоде. Проверьте название города.\n\n🗺️ Например: Москва, Санкт-Петербург, Сочи, Стамбул, Париж", None, None, None
         else:
-            return f"🌍 *{city_name.capitalize()}*\n\n❌ Could not get weather data. Check the city name.", None, None
+            return f"🌍 *{city_name.capitalize()}*\n\n❌ Could not get weather data. Check the city name.", None, None, None
     
     fact_prompt = f"Расскажи один короткий интересный факт о городе {city_name}. Только факт, без лишних слов, 1-2 предложения. Используй эмодзи."
     fact = ask_yandexgpt(fact_prompt, lang)
+    
+    if not fact or "Ошибка" in fact:
+        if lang == "ru":
+            fact = "🏛️ Интересных фактов пока нет, но город определённо стоит посетить!"
+        else:
+            fact = "🏛️ No interesting facts at the moment, but the city is definitely worth visiting!"
     
     day_names = ["сегодня", "завтра", "послезавтра"]
     day_text = day_names[day_offset] if day_offset < len(day_names) else f"через {day_offset} дней"
@@ -349,8 +369,9 @@ def extract_city_and_day_from_text(text):
 
 def get_weather(lat, lon, lang="ru"):
     try:
-        url = f"https://wttr.in/{lat},{lon}?format=j1&lang={lang}"
+        url = f"https://wttr.in/{lat},{lon}?format=j1&lang={lang}&m"
         response = requests.get(url, timeout=10)
+        response.encoding = 'utf-8'
         if response.status_code != 200:
             return None
         data = response.json()
@@ -371,6 +392,7 @@ def get_weather(lat, lon, lang="ru"):
         weather_desc = current.get("lang_ru", [{}])[0].get("value", "")
         if not weather_desc:
             weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
+        weather_desc = re.sub(r'[^\w\sа-яА-Яa-zA-Z\- ]', '', weather_desc)
         if lang == "en":
             weather_text = f"{emoji} {temp}°C, {weather_desc} 💨 {wind_speed} km/h 💧 {humidity}%"
         else:
@@ -381,8 +403,9 @@ def get_weather(lat, lon, lang="ru"):
 
 def get_weather_for_voice(lat, lon, lang="ru"):
     try:
-        url = f"https://wttr.in/{lat},{lon}?format=j1&lang={lang}"
+        url = f"https://wttr.in/{lat},{lon}?format=j1&lang={lang}&m"
         response = requests.get(url, timeout=10)
+        response.encoding = 'utf-8'
         if response.status_code != 200:
             return None
         data = response.json()
@@ -391,9 +414,8 @@ def get_weather_for_voice(lat, lon, lang="ru"):
         weather_desc = current.get("lang_ru", [{}])[0].get("value", "")
         if not weather_desc:
             weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
+        weather_desc = re.sub(r'[^\w\sа-яА-Яa-zA-Z\- ]', '', weather_desc).lower()
         wind_speed = int(current.get("windspeedKmph", "0"))
-        
-        weather_desc_voice = weather_desc.lower()
         
         if wind_speed == 0:
             wind_text = "безветренно"
@@ -406,7 +428,7 @@ def get_weather_for_voice(lat, lon, lang="ru"):
         else:
             wind_text = f"ветер {wind_speed} метров в секунду"
         
-        return f"сегодня, {temp} градусов, {weather_desc_voice}. {wind_text}."
+        return f"сегодня, {temp} градусов, {weather_desc}. {wind_text}."
     except Exception as e:
         print(f"❌ Ошибка get_weather_for_voice: {e}")
         return None
