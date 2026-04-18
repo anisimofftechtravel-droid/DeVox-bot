@@ -658,15 +658,13 @@ def get_city_info_and_food(city_name, lang="ru"):
     return msg, keyboard
 
 def get_city_story(city_name, lang="ru"):
-    """Рассказывает историю города + кнопка билета + фраза про другие города (без дублирования названия)"""
+    """Рассказывает историю города + кнопка билета + фраза про другие города (без заголовка)"""
     
     if lang == "ru":
         prompt = f"Расскажи интересно о городе {city_name}. Напиши 3-4 предложения об истории, культуре, атмосфере, достопримечательностях. Используй эмодзи."
-        msg = f"🏙️ *Интересный рассказ*\n\n"
         end_phrase = "\n\n🗺️ *Хотите узнать о других городах?* Спросите меня, например: «Расскажи про Париж» или «Что посмотреть в Стамбуле?»\n\n🎫 *Или хотите посетить этот город?*"
     else:
         prompt = f"Tell interestingly about the city {city_name}. Write 3-4 sentences about history, culture, atmosphere, attractions. Use emojis."
-        msg = f"🏙️ *Interesting story*\n\n"
         end_phrase = "\n\n🗺️ *Want to know about other cities?* Ask me, for example: \"Tell me about Paris\" or \"What to see in Istanbul?\"\n\n🎫 *Or do you want to visit this city?*"
     
     story = ask_yandexgpt(prompt, lang)
@@ -677,7 +675,7 @@ def get_city_story(city_name, lang="ru"):
         else:
             story = f"✨ This is an amazing city with rich history and unique atmosphere. Everyone will find something interesting here!"
     
-    msg += story + end_phrase
+    msg = story + end_phrase
     keyboard = get_ticket_keyboard(city_name)
     
     return msg, keyboard
@@ -977,16 +975,21 @@ def handle_message(message):
             address = get_address(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
             weather_display = get_weather(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
             
+            # Сохраняем эмодзи для текста, но для голоса убираем
             msg = f"📍 *Ваше местоположение:*\n{address}\n\n"
             if weather_display:
                 msg += f"🌤️ *Погода:* {weather_display}"
             
             send_message(chat_id, msg, get_pet_only_keyboard())
-            # Полное озвучивание
+            
+            # Голосовое сообщение (без эмодзи)
             voice_text = f"Ваше местоположение: {address}. "
             if weather_display:
-                # Очищаем от символов Markdown и извлекаем чистую погоду
-                weather_clean = weather_display.replace('*', '').replace('_', '').replace('☀️', '').replace('⛅', '').replace('☁️', '').replace('🌧️', '').replace('🌨️', '').replace('⛈️', '').replace('🌫️', '').replace('🌡️', '').strip()
+                # Убираем эмодзи и Markdown для голоса
+                weather_clean = weather_display
+                for emoji in ["☀️", "⛅", "☁️", "🌧️", "🌨️", "⛈️", "🌫️", "🌡️", "💧", "💨", "*", "_", "°", "м/с", "km/h"]:
+                    weather_clean = weather_clean.replace(emoji, "")
+                weather_clean = re.sub(r'[^\w\s\.\,\-\d]', '', weather_clean).strip()
                 voice_text += f"Погода: {weather_clean}"
             text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
@@ -1088,7 +1091,10 @@ def handle_callback(chat_id, data, callback_id):
             send_message(chat_id, msg, get_pet_only_keyboard())
             voice_text = f"Ваше местоположение: {address}. "
             if weather_display:
-                weather_clean = weather_display.replace('*', '').replace('_', '').replace('☀️', '').replace('⛅', '').replace('☁️', '').replace('🌧️', '').replace('🌨️', '').replace('⛈️', '').replace('🌫️', '').replace('🌡️', '').strip()
+                weather_clean = weather_display
+                for emoji in ["☀️", "⛅", "☁️", "🌧️", "🌨️", "⛈️", "🌫️", "🌡️", "💧", "💨", "*", "_", "°", "м/с", "km/h"]:
+                    weather_clean = weather_clean.replace(emoji, "")
+                weather_clean = re.sub(r'[^\w\s\.\,\-\d]', '', weather_clean).strip()
                 voice_text += f"Погода: {weather_clean}"
             text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
@@ -1155,10 +1161,7 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
-    print("✅ При выборе языка - только 'Выберите язык'")
-    print("✅ 'Где я?' - чистая озвучка погоды без эмодзи")
-    print("✅ 'Расскажи про...' - без дублирования названия города")
-    print("✅ Погода - без дублирования названия города")
-    print("✅ 'Что поесть в...' - без лишних заголовков")
+    print("✅ 'Где я?' - эмодзи в тексте, голосом чисто")
+    print("✅ 'Расскажи про...' - без лишних заголовков")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
