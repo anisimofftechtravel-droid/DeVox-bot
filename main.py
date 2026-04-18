@@ -595,49 +595,54 @@ def get_city_coords(city_name):
     }
     return city_coords.get(city_name.lower(), (None, None))
 
-def get_city_food_recommendation(city_name, lat, lon, lang="ru"):
-    """Универсальная функция для еды в ЛЮБОМ городе"""
-    places = get_nearby_places_2gis(lat, lon, radius=1000, limit=5)
+# ========== НОВАЯ ФУНКЦИЯ ДЛЯ ЛЮБОГО ГОРОДА (БЕЗ ГЕОЛОКАЦИИ) ==========
+def get_city_info_and_food(city_name, lang="ru"):
+    """Рассказывает о городе, его кухне и предлагает билеты (без геолокации)"""
     
     if lang == "ru":
-        msg = f"🍽️ *Где поесть в {city_name.capitalize()}?*\n\n"
-        msg += "📍 DeVox нашёл для вас лучшие заведения:\n\n"
+        prompt_city = f"Расскажи кратко, чем знаменит город {city_name}? Напиши 2-3 предложения об истории, культуре или атмосфере. Используй эмодзи."
+        prompt_food = f"Какие блюда или кухня знамениты в городе {city_name}? Напиши 2-3 предложения, перечисли популярные блюда. Используй эмодзи."
+        msg = f"🏙️ *{city_name.capitalize()}*\n\n"
     else:
-        msg = f"🍽️ *Where to eat in {city_name.capitalize()}?*\n\n"
-        msg += "📍 DeVox found the best places:\n\n"
+        prompt_city = f"Tell briefly what the city of {city_name} is famous for? Write 2-3 sentences about history, culture or atmosphere. Use emojis."
+        prompt_food = f"What dishes or cuisine are famous in {city_name}? Write 2-3 sentences, list popular dishes. Use emojis."
+        msg = f"🏙️ *{city_name.capitalize()}*\n\n"
     
-    keyboard = []
+    city_info = ask_yandexgpt(prompt_city, lang)
+    food_info = ask_yandexgpt(prompt_food, lang)
     
-    if places:
-        for p in places[:5]:
-            rec = get_place_recommendation(p['name'], lang)
-            msg += f"{p['emoji']} *{p['name']}* — {p['distance']}\n"
-            msg += f"   📍 {p['address']}\n"
-            msg += f"   💡 {rec}\n"
-            if 'rating' in p:
-                msg += f"   ⭐ {p['rating']} ★\n"
-            msg += "\n"
-            
-            route_url = f"https://yandex.ru/maps/?rtext={lon},{lat}~{p['lon']},{p['lat']}&rtt=pd"
-            name_short = p['name'].split(',')[0][:15]
-            keyboard.append([{"text": f"🧭 {name_short}", "url": route_url}])
-    else:
+    if "Ошибка" in city_info or len(city_info) < 10:
         if lang == "ru":
-            msg += "🍽️ *Популярные места:*\n"
-            msg += "• 🥟 Местная кухня\n"
-            msg += "• ☕ Кофейни\n"
-            msg += "• 🍔 Фастфуд\n\n"
+            city_info = f"✨ {city_name.capitalize()} — удивительный город с богатой историей и уникальной атмосферой. Здесь каждый найдёт что-то интересное для себя!"
         else:
-            msg += "🍽️ *Popular places:*\n"
-            msg += "• 🥟 Local cuisine\n"
-            msg += "• ☕ Coffee shops\n"
-            msg += "• 🍔 Fast food\n\n"
+            city_info = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique atmosphere. Everyone will find something interesting here!"
     
-    keyboard.append([{"text": f"🎫 Купить билет в {city_name.capitalize()}", "callback_data": f"ticket_{city_name}"}])
-    keyboard.append([{"text": "🐺 Погладить волка", "callback_data": "pet"}])
-    keyboard.append([{"text": "🔙 В главное меню", "callback_data": "back_to_menu"}])
+    if "Ошибка" in food_info or len(food_info) < 10:
+        if lang == "ru":
+            food_info = f"🍽️ Местная кухня славится своим разнообразием. Обязательно попробуйте традиционные блюда в лучших ресторанах города!"
+        else:
+            food_info = f"🍽️ The local cuisine is famous for its diversity. Be sure to try traditional dishes in the best restaurants of the city!"
     
-    return msg, {"inline_keyboard": keyboard}
+    msg += f"📖 *О городе:*\n{city_info}\n\n"
+    msg += f"🍽️ *Что попробовать:*\n{food_info}\n\n"
+    
+    if lang == "ru":
+        msg += "🎫 *Хотите посетить этот город?*\nНажмите на кнопку ниже, чтобы узнать о билетах (тестовый режим)."
+        ticket_text = f"🎫 Купить билет в {city_name.capitalize()}"
+    else:
+        msg += "🎫 *Want to visit this city?*\nClick the button below to learn about tickets (test mode)."
+        ticket_text = f"🎫 Buy ticket to {city_name.capitalize()}"
+    
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": ticket_text, "callback_data": f"ticket_{city_name}"}],
+            [{"text": "🍽️ Другие города", "callback_data": "find_food"}],
+            [{"text": "🐺 Погладить волка", "callback_data": "pet"}],
+            [{"text": "🔙 В главное меню", "callback_data": "back_to_menu"}]
+        ]
+    }
+    
+    return msg, keyboard
 
 def send_food_places_by_city(chat_id, lat, lon, city_name, lang):
     send_video(chat_id, ANIMATIONS["welcome_location"])
@@ -760,8 +765,8 @@ def send_welcome_and_places(chat_id, lat, lon, is_food_request=False):
     text_to_voice_yandex(voice_msg, chat_id, lang)
 
 def handle_text_message(chat_id, text):
-    # Убираем квадрат загрузки - НЕ ОТПРАВЛЯЕМ ВИДЕО
-    # send_video(chat_id, ANIMATIONS["thinking"])  # ЗАКОММЕНТИРОВАНО
+    # Отправляем анимацию думающего волка
+    send_video(chat_id, ANIMATIONS["thinking"])
     
     lang = user_lang.get(chat_id, "ru")
     text_lower = text.lower()
@@ -770,15 +775,44 @@ def handle_text_message(chat_id, text):
     match = re.search(r'(?:что|где|куда)\s+поесть\s+в\s+([а-яА-Яa-zA-Z\s\-]+)', text_lower)
     if match:
         city_name = match.group(1).strip()
-        lat, lon = get_city_coords(city_name)
-        if lat and lon:
-            msg, keyboard = get_city_food_recommendation(city_name, lat, lon, lang)
-            send_message(chat_id, msg, keyboard)
-            text_to_voice_yandex(f"Рассказываю, где можно поесть в городе {city_name}.", chat_id, lang)
-            return
+        # НЕ используем геолокацию! Просто рассказываем о городе
+        msg, keyboard = get_city_info_and_food(city_name, lang)
+        send_message(chat_id, msg, keyboard)
+        text_to_voice_yandex(f"Рассказываю о городе {city_name}.", chat_id, lang)
+        return
+    
+    # Проверяем, спрашивают ли "чем славится город"
+    fame_match = re.search(r'(?:чем|чем именно)\s+славится\s+([а-яА-Яa-zA-Z\s\-]+)', text_lower)
+    if not fame_match:
+        fame_match = re.search(r'чем знаменит\s+([а-яА-Яa-zA-Z\s\-]+)', text_lower)
+    
+    if fame_match:
+        city_name = fame_match.group(1).strip()
+        if lang == "ru":
+            prompt = f"Расскажи кратко, чем знаменит город {city_name}? Напиши 2-3 предложения. Используй эмодзи."
+            msg_header = f"🏙️ *Чем славится {city_name.capitalize()}?*\n\n"
         else:
-            send_message(chat_id, f"🌍 *{city_name.capitalize()}*\n\n🗺️ Я ещё не добавил этот город в базу, но скоро добавлю! А пока попробуйте спросить про Москву, Питер или Сочи.", get_pet_only_keyboard())
-            return
+            prompt = f"Tell briefly what the city of {city_name} is famous for? Write 2-3 sentences. Use emojis."
+            msg_header = f"🏙️ *What is {city_name.capitalize()} famous for?*\n\n"
+        
+        answer = ask_yandexgpt(prompt, lang)
+        if "Ошибка" in answer or len(answer) < 10:
+            if lang == "ru":
+                answer = f"✨ {city_name.capitalize()} — удивительный город с богатой историей и уникальными достопримечательностями. Здесь каждый найдёт что-то интересное для себя!"
+            else:
+                answer = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique attractions. Everyone will find something interesting here!"
+        
+        msg = msg_header + answer
+        
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": f"🎫 Купить билет в {city_name.capitalize()}", "callback_data": f"ticket_{city_name}"}],
+                [{"text": "🐺 Погладить волка", "callback_data": "pet"}]
+            ]
+        }
+        send_message(chat_id, msg, keyboard)
+        text_to_voice_yandex(answer, chat_id, lang)
+        return
     
     # Проверка на запрос еды (без указания города)
     food_keywords = ["поесть", "еда", "ресторан", "кафе", "кофейня", "где поесть", "что поесть", "покушать", "вкусно"]
@@ -894,7 +928,7 @@ def handle_callback(chat_id, data, callback_id):
         
         keyboard = {
             "inline_keyboard": [
-                [{"text": "🍽️ Ещё заведения", "callback_data": f"more_food_{city_name}"}],
+                [{"text": "🍽️ Ещё о городе", "callback_data": f"more_food_{city_name}"}],
                 [{"text": "🐺 Погладить волка", "callback_data": "pet"}],
                 [{"text": "🔙 В главное меню", "callback_data": "back_to_menu"}]
             ]
@@ -904,12 +938,8 @@ def handle_callback(chat_id, data, callback_id):
     elif data.startswith("more_food_"):
         city_name = data.replace("more_food_", "")
         lang = user_lang.get(chat_id, "ru")
-        lat, lon = get_city_coords(city_name)
-        if lat and lon:
-            msg, keyboard = get_city_food_recommendation(city_name, lat, lon, lang)
-            send_message(chat_id, msg, keyboard)
-        else:
-            send_message(chat_id, f"🌍 Извините, город {city_name} временно недоступен.", get_pet_only_keyboard())
+        msg, keyboard = get_city_info_and_food(city_name, lang)
+        send_message(chat_id, msg, keyboard)
     
     elif data == "back_to_menu":
         send_message(chat_id, "📱 *Главное меню:*", get_main_menu_keyboard())
@@ -923,7 +953,7 @@ def handle_callback(chat_id, data, callback_id):
             send_welcome_and_places(chat_id, lat, lon, is_food_request=True)
         else:
             user_pending_food_request[chat_id] = True
-            send_message(chat_id, "🍽️ *Чтобы найти места, где поесть, отправьте геопозицию.*", get_location_reply_keyboard())
+            send_message(chat_id, "🍽️ *Чтобы найти места, где поесть, отправьте геопозицию или напишите город.*\n\nНапример: «Что поесть в Москве?»", get_location_reply_keyboard())
     
     elif data == "where_am_i":
         saved_loc = load_user_location(chat_id)
@@ -1005,7 +1035,8 @@ if __name__ == "__main__":
     print("✅ Рекомендации мест с AI-подсказками")
     print("✅ Кнопки маршрута и бронирования")
     print("✅ Сохранение локации в файл")
-    print("✅ Универсальный поиск еды: 'Что поесть в [любой город]'")
-    print("✅ Кнопка 'Купить билет' (тестовый режим)")
+    print("✅ Универсальный поиск еды: 'Что поесть в [любой город]' (без геолокации!)")
+    print("✅ 'Чем славится [город]' - рассказывает о достопримечательностях")
+    print("✅ Кнопка 'Купить билет' для ЛЮБОГО города (тестовый режим)")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
