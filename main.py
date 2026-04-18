@@ -189,13 +189,15 @@ def is_travel_related(question):
         "экскурсия", "гид", "сувенир", "шопинг", "рынок",
         "памятник", "церковь", "замок", "крепость", "природ", "озеро", "водопад",
         "где я", "мой адрес", "что рядом", "места рядом", "погладить волка", "pet",
-        "расскажи про", "расскажи о", "что посмотреть", "что интересного"
+        "расскажи про", "расскажи о", "что посмотреть", "что интересного",
+        "добраться", "как добраться", "дорога", "маршрут", "транспорт", "билеты на автобус",
+        "поездка", "на машине", "на автобусе", "на поезде", "на самолете", "такси"
     ]
     for keyword in travel_keywords:
         if keyword in question_lower:
             return True
     
-    cities = ["москва", "питер", "спб", "сочи", "казань", "стамбул", "париж", "лондон", "берлин", "рим", "токио", "пекин", "прага", "варшава", "нью-йорк"]
+    cities = ["москва", "питер", "спб", "сочи", "казань", "стамбул", "париж", "лондон", "берлин", "рим", "токио", "пекин", "прага", "варшава", "нью-йорк", "набережные челны", "челны"]
     for city in cities:
         if city in question_lower:
             return True
@@ -205,18 +207,18 @@ def is_travel_related(question):
 def ask_yandexgpt(question, user_lang_code="ru"):
     if not is_travel_related(question):
         if user_lang_code == "ru":
-            return "🌍 *Извините, я отвечаю только на вопросы о путешествиях, туризме, городах, достопримечательностях, погоде, билетах, отелях и мероприятиях.*\n\nЗадайте вопрос, связанный с путешествиями, например:\n• Расскажи о Париже\n• Что посмотреть в Стамбуле?\n• Какая погода в Сочи?\n• Найди билеты в Москву\n• Что происходит в Санкт-Петербурге?\n• Где я?\n• Что рядом?\n• Кто ты? (вопрос обо мне)"
+            return "🌍 *Извините, я отвечаю только на вопросы о путешествиях, туризме, городах, достопримечательностях, погоде, билетах, отелях, транспорте и мероприятиях.*\n\nЗадайте вопрос, связанный с путешествиями, например:\n• Расскажи о Париже\n• Что посмотреть в Стамбуле?\n• Какая погода в Сочи?\n• Найди билеты в Москву\n• Как добраться из Москвы в Казань?\n• Что происходит в Санкт-Петербурге?\n• Где я?\n• Что рядом?\n• Кто ты? (вопрос обо мне)"
         elif user_lang_code == "en":
-            return "🌍 *Sorry, I only answer questions about travel, tourism, cities, attractions, weather, tickets, hotels and events.*\n\nAsk a travel-related question, for example:\n• Tell me about Paris\n• What to see in Istanbul?\n• What's the weather in Sochi?\n• Find tickets to Moscow\n• Where am I?\n• What's nearby?\n• Who are you? (questions about me)"
+            return "🌍 *Sorry, I only answer questions about travel, tourism, cities, attractions, weather, tickets, hotels, transport and events.*\n\nAsk a travel-related question, for example:\n• Tell me about Paris\n• What to see in Istanbul?\n• What's the weather in Sochi?\n• Find tickets to Moscow\n• How to get from Moscow to Kazan?\n• Where am I?\n• What's nearby?\n• Who are you? (questions about me)"
         else:
-            return "🌍 *抱歉，我只回答关于旅行、旅游、城市、景点、天气、机票、酒店和活动的问题。*\n\n请提出与旅行相关的问题，例如：\n• 告诉我关于巴黎的事\n• 在伊斯坦布尔看什么？\n• 索契的天气怎么样？\n• 查找去莫斯科的机票\n• 我在哪里？\n• 附近有什么？\n• 你是谁？（关于我的问题）"
+            return "🌍 *抱歉，我只回答关于旅行、旅游、城市、景点、天气、机票、酒店、交通和活动的问题。*\n\n请提出与旅行相关的问题，例如：\n• 告诉我关于巴黎的事\n• 在伊斯坦布尔看什么？\n• 索契的天气怎么样？\n• 查找去莫斯科的机票\n• 如何从莫斯科到喀山？\n• 我在哪里？\n• 附近有什么？\n• 你是谁？（关于我的问题）"
     
     if user_lang_code == "ru":
-        system_prompt = "Ты — DeVox, помощник для путешествий с головой волка. Отвечай на русском языке кратко, используй эмодзи. Отвечай только на вопросы о путешествиях, городах, достопримечательностях, культуре, географии, климате, транспорте, кухне, истории, традициях, отелях, билетах, погоде, мероприятиях. Если спрашивают о тебе — расскажи, что ты DeVox, голосовой помощник для путешествий, который помогает находить места, погоду, билеты и интересные факты. Твой характер — дружелюбный волк."
+        system_prompt = "Ты — DeVox, помощник для путешествий с головой волка. Отвечай на русском языке кратко, используй эмодзи. Отвечай на вопросы о путешествиях, городах, достопримечательностях, культуре, географии, климате, транспорте, как добраться, билетах, отелях, погоде, мероприятиях. Если спрашивают о тебе — расскажи, что ты DeVox, голосовой помощник для путешествий. Твой характер — дружелюбный волк."
     elif user_lang_code == "en":
-        system_prompt = "You are DeVox, a travel assistant with a wolf head. Answer in English briefly, use emojis. Answer only questions about travel, cities, attractions, culture, geography, climate, transport, cuisine, history, traditions, hotels, tickets, weather, events. If asked about yourself, tell that you are DeVox, a voice travel assistant that helps find places, weather, tickets and interesting facts. Your character is a friendly wolf."
+        system_prompt = "You are DeVox, a travel assistant with a wolf head. Answer in English briefly, use emojis. Answer questions about travel, cities, attractions, culture, geography, climate, transport, how to get, tickets, hotels, weather, events. If asked about yourself, tell that you are DeVox, a voice travel assistant. Your character is a friendly wolf."
     else:
-        system_prompt = "你是DeVox，一个长着狼头的旅行助手。用中文简短回答，使用表情符号。只回答关于旅行、城市、景点、文化、地理、气候、交通、美食、历史、传统、酒店、机票、天气、活动的问题。如果问起你自己，告诉他们你是DeVox，一个帮助寻找地点、天气、机票和有趣事实的语音旅行助手。你的性格是友好的狼。"
+        system_prompt = "你是DeVox，一个长着狼头的旅行助手。用中文简短回答，使用表情符号。回答关于旅行、城市、景点、文化、地理、气候、交通、如何到达、机票、酒店、天气、活动的问题。如果问起你自己，告诉他们你是DeVox，一个语音旅行助手。你的性格是友好的狼。"
     
     url = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
     headers = {"Authorization": f"Api-Key {YANDEX_API_KEY}", "Content-Type": "application/json"}
@@ -334,7 +336,7 @@ def extract_city_and_day_from_text(text):
             if variant in clean_text:
                 return city, day_offset
     
-    words_to_remove = ["какая", "погода", "во", "на", "сегодня", "сейчас", "температура", "weather", "в", "какой", "будет"]
+    words_to_remove = ["какая", "погода", "во", "на", "сегодня", "сейчас", "температура", "weather", "в", "какой", "будет", "как", "добраться", "быстро"]
     query = clean_text
     for word in words_to_remove:
         query = query.replace(word, "")
@@ -616,7 +618,7 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
-    print("✅ Бот отвечает на вопросы о путешествиях и о себе")
+    print("✅ Бот отвечает на вопросы о путешествиях, транспорте и о себе")
     print("✅ Погода на сегодня, завтра, послезавтра и неделю")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
