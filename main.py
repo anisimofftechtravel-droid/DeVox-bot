@@ -307,9 +307,9 @@ def get_weather_with_facts(city_name, day_offset=0, lang="ru"):
     
     if not weather:
         if lang == "ru":
-            return f"🌍 *{city_name.capitalize()}*\n\n❌ Не удалось получить данные о погоде. Проверьте название города.\n\n🗺️ Например: Москва, Санкт-Петербург, Сочи, Стамбул, Париж", None, None, None
+            return f"❌ Не удалось получить данные о погоде. Проверьте название города.\n\n🗺️ Например: Москва, Санкт-Петербург, Сочи, Стамбул, Париж", None, None, None
         else:
-            return f"🌍 *{city_name.capitalize()}*\n\n❌ Could not get weather data. Check the city name.", None, None, None
+            return f"❌ Could not get weather data. Check the city name.", None, None, None
     
     fact_prompt = f"Расскажи один короткий интересный факт о городе {city_name}. Только факт, без лишних слов, 1-2 предложения. Используй эмодзи."
     fact = ask_yandexgpt(fact_prompt, lang)
@@ -324,14 +324,12 @@ def get_weather_with_facts(city_name, day_offset=0, lang="ru"):
     day_text = day_names[day_offset] if day_offset < len(day_names) else f"через {day_offset} дней"
     
     if lang == "ru":
-        response = f"🌍 *{city_name.capitalize()}*\n\n"
-        response += f"{weather['emoji']} *{day_text.capitalize()}* **+{weather['temp']}°C**, {weather['condition'].lower()}, "
+        response = f"{weather['emoji']} *{day_text.capitalize()}* **+{weather['temp']}°C**, {weather['condition'].lower()}, "
         response += f"ветер {weather['wind']} м/с, влажность {weather['humidity']}%.\n\n"
         response += f"🏝️ *Интересный факт:* {fact}\n\n"
         response += f"🗺️ *Хотите узнать о других городах?* Спросите меня, например: «Какая погода в Сочи?»"
     else:
-        response = f"🌍 *{city_name.capitalize()}*\n\n"
-        response += f"{weather['emoji']} *{day_text.capitalize()}* **+{weather['temp']}°C**, {weather['condition'].lower()}, "
+        response = f"{weather['emoji']} *{day_text.capitalize()}* **+{weather['temp']}°C**, {weather['condition'].lower()}, "
         response += f"wind {weather['wind']} m/s, humidity {weather['humidity']}%.\n\n"
         response += f"🏝️ *Interesting fact:* {fact}\n\n"
         response += f"🗺️ *Want to know about other cities?* Ask me, for example: \"What's the weather in Sochi?\""
@@ -355,12 +353,10 @@ def get_weather_for_voice_by_city(weather, fact, day_text, lang="ru"):
     else:
         wind_text = f"ветер {wind_speed} метров в секунду"
     
-    humidity_text = f"влажность {humidity} процентов"
-    
     if lang == "ru":
-        return f"{day_text}, {temp} градусов, {weather_desc}. {wind_text}. {humidity_text}. {fact}. Хотите узнать о погоде в другом городе? Спросите меня!"
+        return f"{day_text}, {temp} градусов, {weather_desc}. {wind_text}. Влажность {humidity} процентов. {fact}. Хотите узнать о погоде в другом городе? Спросите меня!"
     else:
-        return f"{day_text}, {temp} degrees, {weather_desc}. {wind_text}. {humidity_text}. {fact}. Want to know the weather in another city? Ask me!"
+        return f"{day_text}, {temp} degrees, {weather_desc}. {wind_text}. Humidity {humidity} percent. {fact}. Want to know the weather in another city? Ask me!"
 
 def extract_city_and_day_from_text(text):
     text_lower = text.lower()
@@ -470,6 +466,7 @@ def get_weather_for_voice(lat, lon, lang="ru"):
             weather_desc = current.get("weatherDesc", [{}])[0].get("value", "")
         weather_desc = re.sub(r'[^\w\sа-яА-Яa-zA-Z\- ]', '', weather_desc).lower()
         wind_speed = int(current.get("windspeedKmph", "0"))
+        humidity = current.get("humidity", "?")
         
         if wind_speed == 0:
             wind_text = "безветренно"
@@ -482,7 +479,7 @@ def get_weather_for_voice(lat, lon, lang="ru"):
         else:
             wind_text = f"ветер {wind_speed} метров в секунду"
         
-        return f"сегодня, {temp} градусов, {weather_desc}. {wind_text}."
+        return f"сегодня, {temp} градусов, {weather_desc}. {wind_text}. Влажность {humidity} процентов."
     except Exception as e:
         print(f"❌ Ошибка get_weather_for_voice: {e}")
         return None
@@ -597,20 +594,20 @@ def get_city_attractions(city_name, lang="ru"):
     
     if lang == "ru":
         prompt = f"Расскажи о главных достопримечательностях города {city_name}. Напиши 3-4 предложения, перечисли самые известные места. Используй эмодзи."
-        msg_header = f"🏛️ *Что посмотреть в {city_name.capitalize()}?*\n\n"
+        msg = f"🏛️ *Что посмотреть?*\n\n"
     else:
         prompt = f"Tell about the main attractions of the city {city_name}. Write 3-4 sentences, list the most famous places. Use emojis."
-        msg_header = f"🏛️ *What to see in {city_name.capitalize()}?*\n\n"
+        msg = f"🏛️ *What to see?*\n\n"
     
     attractions = ask_yandexgpt(prompt, lang)
     
     if "Ошибка" in attractions or len(attractions) < 20:
         if lang == "ru":
-            attractions = f"✨ В {city_name.capitalize()} множество интересных мест: исторический центр, музеи, парки и архитектурные памятники. Каждый турист найдёт что-то по душе!"
+            attractions = f"✨ В этом городе множество интересных мест: исторический центр, музеи, парки и архитектурные памятники. Каждый турист найдёт что-то по душе!"
         else:
-            attractions = f"✨ {city_name.capitalize()} has many interesting places: historical center, museums, parks and architectural monuments. Every tourist will find something to their liking!"
+            attractions = f"✨ This city has many interesting places: historical center, museums, parks and architectural monuments. Every tourist will find something to their liking!"
     
-    msg = msg_header + attractions + "\n\n"
+    msg += attractions + "\n\n"
     
     if lang == "ru":
         msg += "🎫 *Хотите посетить этот город?*"
@@ -627,20 +624,20 @@ def get_city_info_and_food(city_name, lang="ru"):
     if lang == "ru":
         prompt_city = f"Расскажи кратко, чем знаменит город {city_name}? Напиши 2-3 предложения об истории, культуре или атмосфере. Используй эмодзи."
         prompt_food = f"Какие блюда или кухня знамениты в городе {city_name}? Напиши 2-3 предложения, перечисли популярные блюда. Используй эмодзи."
-        msg = f"🏙️ *{city_name.capitalize()}*\n\n"
+        msg = f"🏙️ *О городе и кухне*\n\n"
     else:
         prompt_city = f"Tell briefly what the city of {city_name} is famous for? Write 2-3 sentences about history, culture or atmosphere. Use emojis."
         prompt_food = f"What dishes or cuisine are famous in {city_name}? Write 2-3 sentences, list popular dishes. Use emojis."
-        msg = f"🏙️ *{city_name.capitalize()}*\n\n"
+        msg = f"🏙️ *About the city and cuisine*\n\n"
     
     city_info = ask_yandexgpt(prompt_city, lang)
     food_info = ask_yandexgpt(prompt_food, lang)
     
     if "Ошибка" in city_info or len(city_info) < 10:
         if lang == "ru":
-            city_info = f"✨ {city_name.capitalize()} — удивительный город с богатой историей и уникальной атмосферой. Здесь каждый найдёт что-то интересное для себя!"
+            city_info = f"✨ Этот город — удивительное место с богатой историей и уникальной атмосферой. Здесь каждый найдёт что-то интересное для себя!"
         else:
-            city_info = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique atmosphere. Everyone will find something interesting here!"
+            city_info = f"✨ This city is an amazing place with rich history and unique atmosphere. Everyone will find something interesting here!"
     
     if "Ошибка" in food_info or len(food_info) < 10:
         if lang == "ru":
@@ -661,26 +658,26 @@ def get_city_info_and_food(city_name, lang="ru"):
     return msg, keyboard
 
 def get_city_story(city_name, lang="ru"):
-    """Рассказывает историю города + кнопка билета + фраза про другие города"""
+    """Рассказывает историю города + кнопка билета + фраза про другие города (без дублирования названия)"""
     
     if lang == "ru":
         prompt = f"Расскажи интересно о городе {city_name}. Напиши 3-4 предложения об истории, культуре, атмосфере, достопримечательностях. Используй эмодзи."
-        msg_header = f"🏙️ *{city_name.capitalize()}*\n\n"
+        msg = f"🏙️ *Интересный рассказ*\n\n"
         end_phrase = "\n\n🗺️ *Хотите узнать о других городах?* Спросите меня, например: «Расскажи про Париж» или «Что посмотреть в Стамбуле?»\n\n🎫 *Или хотите посетить этот город?*"
     else:
         prompt = f"Tell interestingly about the city {city_name}. Write 3-4 sentences about history, culture, atmosphere, attractions. Use emojis."
-        msg_header = f"🏙️ *{city_name.capitalize()}*\n\n"
+        msg = f"🏙️ *Interesting story*\n\n"
         end_phrase = "\n\n🗺️ *Want to know about other cities?* Ask me, for example: \"Tell me about Paris\" or \"What to see in Istanbul?\"\n\n🎫 *Or do you want to visit this city?*"
     
     story = ask_yandexgpt(prompt, lang)
     
     if "Ошибка" in story or len(story) < 20:
         if lang == "ru":
-            story = f"✨ {city_name.capitalize()} — удивительный город с богатой историей и уникальной атмосферой. Здесь каждый найдёт что-то интересное для себя!"
+            story = f"✨ Это удивительный город с богатой историей и уникальной атмосферой. Здесь каждый найдёт что-то интересное для себя!"
         else:
-            story = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique atmosphere. Everyone will find something interesting here!"
+            story = f"✨ This is an amazing city with rich history and unique atmosphere. Everyone will find something interesting here!"
     
-    msg = msg_header + story + end_phrase
+    msg += story + end_phrase
     keyboard = get_ticket_keyboard(city_name)
     
     return msg, keyboard
@@ -878,21 +875,21 @@ def handle_text_message(chat_id, text):
         city_name = fame_match.group(1).strip()
         if lang == "ru":
             prompt = f"Расскажи кратко, чем знаменит город {city_name}? Напиши 2-3 предложения. Используй эмодзи."
-            msg_header = f"🏙️ *Чем славится {city_name.capitalize()}?*\n\n"
+            msg = f"🏙️ *Чем славится этот город?*\n\n"
             end_phrase = "\n\n🎫 *Хотите посетить этот город?*"
         else:
             prompt = f"Tell briefly what the city of {city_name} is famous for? Write 2-3 sentences. Use emojis."
-            msg_header = f"🏙️ *What is {city_name.capitalize()} famous for?*\n\n"
+            msg = f"🏙️ *What is this city famous for?*\n\n"
             end_phrase = "\n\n🎫 *Want to visit this city?*"
         
         answer = ask_yandexgpt(prompt, lang)
         if "Ошибка" in answer or len(answer) < 10:
             if lang == "ru":
-                answer = f"✨ {city_name.capitalize()} — удивительный город с богатой историей и уникальными достопримечательностями. Здесь каждый найдёт что-то интересное для себя!"
+                answer = f"✨ Этот город — удивительное место с богатой историей и уникальными достопримечательностями. Здесь каждый найдёт что-то интересное для себя!"
             else:
-                answer = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique attractions. Everyone will find something interesting here!"
+                answer = f"✨ This city is an amazing place with rich history and unique attractions. Everyone will find something interesting here!"
         
-        msg = msg_header + answer + end_phrase
+        msg += answer + end_phrase
         keyboard = get_ticket_keyboard(city_name)
         send_message(chat_id, msg, keyboard)
         voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
@@ -958,7 +955,6 @@ def handle_message(message):
     if text == "/start":
         send_video(chat_id, ANIMATIONS["welcome_start"])
         time.sleep(0.5)
-        # Убрали "Добро пожаловать в DeVox!", оставили только выбор языка
         send_message(chat_id, "🌍 *Выберите язык / Select language / 选择语言:*", get_language_keyboard())
     
     elif text == "/pet":
@@ -989,7 +985,8 @@ def handle_message(message):
             # Полное озвучивание
             voice_text = f"Ваше местоположение: {address}. "
             if weather_display:
-                weather_clean = weather_display.replace('*', '').replace('_', '')
+                # Очищаем от символов Markdown и извлекаем чистую погоду
+                weather_clean = weather_display.replace('*', '').replace('_', '').replace('☀️', '').replace('⛅', '').replace('☁️', '').replace('🌧️', '').replace('🌨️', '').replace('⛈️', '').replace('🌫️', '').replace('🌡️', '').strip()
                 voice_text += f"Погода: {weather_clean}"
             text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
@@ -1091,7 +1088,7 @@ def handle_callback(chat_id, data, callback_id):
             send_message(chat_id, msg, get_pet_only_keyboard())
             voice_text = f"Ваше местоположение: {address}. "
             if weather_display:
-                weather_clean = weather_display.replace('*', '').replace('_', '')
+                weather_clean = weather_display.replace('*', '').replace('_', '').replace('☀️', '').replace('⛅', '').replace('☁️', '').replace('🌧️', '').replace('🌨️', '').replace('⛈️', '').replace('🌫️', '').replace('🌡️', '').strip()
                 voice_text += f"Погода: {weather_clean}"
             text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
@@ -1158,9 +1155,10 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
-    print("✅ При выборе языка - только 'Выберите язык' на трёх языках")
-    print("✅ 'Где я?' - анимация + полное озвучивание адреса и погоды")
-    print("✅ 'Расскажи про Набережные Челны' - полное озвучивание + фраза про другие города + билет")
-    print("✅ 'Привет' - полное озвучивание")
+    print("✅ При выборе языка - только 'Выберите язык'")
+    print("✅ 'Где я?' - чистая озвучка погоды без эмодзи")
+    print("✅ 'Расскажи про...' - без дублирования названия города")
+    print("✅ Погода - без дублирования названия города")
+    print("✅ 'Что поесть в...' - без лишних заголовков")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
