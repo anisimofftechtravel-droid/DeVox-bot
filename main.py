@@ -126,10 +126,6 @@ def get_pet_only_keyboard():
 def get_ticket_keyboard(city_name):
     return {"inline_keyboard": [[{"text": f"🎫 Купить билет в {city_name.capitalize()}", "callback_data": f"ticket_{city_name}"}], [{"text": "🐺 Погладить волка", "callback_data": "pet"}]]}
 
-def get_ticket_keyboard_no_extra(city_name):
-    """Клавиатура только с билетом (без лишних кнопок)"""
-    return {"inline_keyboard": [[{"text": f"🎫 Купить билет в {city_name.capitalize()}", "callback_data": f"ticket_{city_name}"}]]}
-
 def get_address(lat, lon, lang="ru"):
     url = "https://geocode-maps.yandex.ru/1.x/"
     params = {"geocode": f"{lon},{lat}", "format": "json", "apikey": YANDEX_GEO_KEY, "results": 1}
@@ -664,6 +660,31 @@ def get_city_info_and_food(city_name, lang="ru"):
     
     return msg, keyboard
 
+def get_city_story(city_name, lang="ru"):
+    """Рассказывает историю города + кнопка билета + фраза про другие города"""
+    
+    if lang == "ru":
+        prompt = f"Расскажи интересно о городе {city_name}. Напиши 3-4 предложения об истории, культуре, атмосфере, достопримечательностях. Используй эмодзи."
+        msg_header = f"🏙️ *{city_name.capitalize()}*\n\n"
+        end_phrase = "\n\n🗺️ *Хотите узнать о других городах?* Спросите меня, например: «Расскажи про Париж» или «Что посмотреть в Стамбуле?»\n\n🎫 *Или хотите посетить этот город?*"
+    else:
+        prompt = f"Tell interestingly about the city {city_name}. Write 3-4 sentences about history, culture, atmosphere, attractions. Use emojis."
+        msg_header = f"🏙️ *{city_name.capitalize()}*\n\n"
+        end_phrase = "\n\n🗺️ *Want to know about other cities?* Ask me, for example: \"Tell me about Paris\" or \"What to see in Istanbul?\"\n\n🎫 *Or do you want to visit this city?*"
+    
+    story = ask_yandexgpt(prompt, lang)
+    
+    if "Ошибка" in story or len(story) < 20:
+        if lang == "ru":
+            story = f"✨ {city_name.capitalize()} — удивительный город с богатой историей и уникальной атмосферой. Здесь каждый найдёт что-то интересное для себя!"
+        else:
+            story = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique atmosphere. Everyone will find something interesting here!"
+    
+    msg = msg_header + story + end_phrase
+    keyboard = get_ticket_keyboard(city_name)
+    
+    return msg, keyboard
+
 def send_food_places_by_city(chat_id, lat, lon, city_name, lang):
     send_video(chat_id, ANIMATIONS["welcome_location"])
     time.sleep(0.5)
@@ -796,10 +817,12 @@ def handle_text_message(chat_id, text):
     if any(greeting in text_lower for greeting in greetings):
         if lang == "ru":
             response = "🐺 *Привет-привет!* Я DeVox — твой голосовой помощник в мире путешествий!\n\n✨ *Чем могу помочь?*\n\n• Расскажу о любом городе\n• Покажу, где вкусно поесть\n• Подскажу погоду\n• Посоветую, что посмотреть\n• И даже помогу с билетами!\n\n🌍 *Спрашивай что угодно о путешествиях!*"
+            voice_text = "Привет-привет! Я DeVox, твой голосовой помощник в мире путешествий. Чем могу помочь? Расскажу о любом городе, покажу где вкусно поесть, подскажу погоду, посоветую что посмотреть, и даже помогу с билетами. Спрашивай что угодно о путешествиях!"
         else:
             response = "🐺 *Hello!* I'm DeVox — your voice assistant in the world of travel!\n\n✨ *How can I help?*\n\n• Tell you about any city\n• Show where to eat\n• Tell the weather\n• Suggest what to see\n• Even help with tickets!\n\n🌍 *Ask me anything about travel!*"
+            voice_text = "Hello! I'm DeVox, your voice assistant in the world of travel. How can I help? Tell you about any city, show where to eat, tell the weather, suggest what to see, even help with tickets. Ask me anything about travel!"
         send_message(chat_id, response, get_pet_only_keyboard())
-        text_to_voice_yandex("Привет! Я DeVox, твой голосовой помощник в путешествиях. Чем могу помочь?", chat_id, lang)
+        text_to_voice_yandex(voice_text, chat_id, lang)
         return
     
     # ===== "РАССКАЖИ ПРО" (для любого города) =====
@@ -813,30 +836,12 @@ def handle_text_message(chat_id, text):
             text_to_voice_yandex(answer, chat_id, lang)
             return
         
-        # Иначе рассказываем о городе с кнопкой билета
-        if lang == "ru":
-            prompt = f"Расскажи интересно о городе {city_name}. Напиши 3-4 предложения об истории, культуре, атмосфере. Используй эмодзи."
-            msg_header = f"🏙️ *{city_name.capitalize()}*\n\n"
-        else:
-            prompt = f"Tell interestingly about the city {city_name}. Write 3-4 sentences about history, culture, atmosphere. Use emojis."
-            msg_header = f"🏙️ *{city_name.capitalize()}*\n\n"
-        
-        city_story = ask_yandexgpt(prompt, lang)
-        if "Ошибка" in city_story or len(city_story) < 20:
-            if lang == "ru":
-                city_story = f"✨ {city_name.capitalize()} — удивительный город с богатой историей и уникальной атмосферой. Здесь каждый найдёт что-то интересное для себя!"
-            else:
-                city_story = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique atmosphere!"
-        
-        msg = msg_header + city_story + "\n\n"
-        
-        if lang == "ru":
-            msg += "🎫 *Хотите посетить этот город?*"
-        else:
-            msg += "🎫 *Want to visit this city?*"
-        
-        send_message(chat_id, msg, get_ticket_keyboard(city_name))
-        text_to_voice_yandex(f"Рассказываю о городе {city_name}.", chat_id, lang)
+        # Иначе рассказываем о городе с полным озвучиванием
+        msg, keyboard = get_city_story(city_name, lang)
+        send_message(chat_id, msg, keyboard)
+        # Озвучиваем полный текст (без Markdown)
+        voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+        text_to_voice_yandex(voice_msg, chat_id, lang)
         return
     
     # ===== "ЧТО ПОСМОТРЕТЬ" =====
@@ -850,7 +855,8 @@ def handle_text_message(chat_id, text):
         city_name = attractions_match.group(1).strip()
         msg, keyboard = get_city_attractions(city_name, lang)
         send_message(chat_id, msg, keyboard)
-        text_to_voice_yandex(f"Рассказываю о достопримечательностях города {city_name}.", chat_id, lang)
+        voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+        text_to_voice_yandex(voice_msg, chat_id, lang)
         return
     
     # ===== "ЧТО ПОЕСТЬ" =====
@@ -859,7 +865,8 @@ def handle_text_message(chat_id, text):
         city_name = match.group(1).strip()
         msg, keyboard = get_city_info_and_food(city_name, lang)
         send_message(chat_id, msg, keyboard)
-        text_to_voice_yandex(f"Рассказываю о городе {city_name}.", chat_id, lang)
+        voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+        text_to_voice_yandex(voice_msg, chat_id, lang)
         return
     
     # ===== "ЧЕМ СЛАВИТСЯ" =====
@@ -872,9 +879,11 @@ def handle_text_message(chat_id, text):
         if lang == "ru":
             prompt = f"Расскажи кратко, чем знаменит город {city_name}? Напиши 2-3 предложения. Используй эмодзи."
             msg_header = f"🏙️ *Чем славится {city_name.capitalize()}?*\n\n"
+            end_phrase = "\n\n🎫 *Хотите посетить этот город?*"
         else:
             prompt = f"Tell briefly what the city of {city_name} is famous for? Write 2-3 sentences. Use emojis."
             msg_header = f"🏙️ *What is {city_name.capitalize()} famous for?*\n\n"
+            end_phrase = "\n\n🎫 *Want to visit this city?*"
         
         answer = ask_yandexgpt(prompt, lang)
         if "Ошибка" in answer or len(answer) < 10:
@@ -883,16 +892,11 @@ def handle_text_message(chat_id, text):
             else:
                 answer = f"✨ {city_name.capitalize()} is an amazing city with rich history and unique attractions. Everyone will find something interesting here!"
         
-        msg = msg_header + answer + "\n\n"
-        
-        if lang == "ru":
-            msg += "🎫 *Хотите посетить этот город?*"
-        else:
-            msg += "🎫 *Want to visit this city?*"
-        
+        msg = msg_header + answer + end_phrase
         keyboard = get_ticket_keyboard(city_name)
         send_message(chat_id, msg, keyboard)
-        text_to_voice_yandex(answer, chat_id, lang)
+        voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+        text_to_voice_yandex(voice_msg, chat_id, lang)
         return
     
     # ===== ЗАПРОС ЕДЫ (БЕЗ УКАЗАНИЯ ГОРОДА) =====
@@ -910,6 +914,8 @@ def handle_text_message(chat_id, text):
             else:
                 msg, keyboard = get_city_info_and_food(target_city, lang)
                 send_message(chat_id, msg, keyboard)
+                voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+                text_to_voice_yandex(voice_msg, chat_id, lang)
                 return
         
         elif chat_id in user_last_location:
@@ -935,13 +941,15 @@ def handle_text_message(chat_id, text):
             voice_full = get_weather_for_voice_by_city(weather, fact, day_text, lang)
             text_to_voice_yandex(voice_full, chat_id, lang)
         else:
-            text_to_voice_yandex(answer, chat_id, lang)
+            voice_msg = answer.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+            text_to_voice_yandex(voice_msg, chat_id, lang)
         return
     
     # ===== ОБЩИЙ ВОПРОС =====
     answer = ask_yandexgpt(text, lang)
     send_message(chat_id, answer, get_pet_only_keyboard())
-    text_to_voice_yandex(answer, chat_id, lang)
+    voice_msg = answer.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+    text_to_voice_yandex(voice_msg, chat_id, lang)
 
 def handle_message(message):
     chat_id = message["chat"]["id"]
@@ -950,13 +958,17 @@ def handle_message(message):
     if text == "/start":
         send_video(chat_id, ANIMATIONS["welcome_start"])
         time.sleep(0.5)
-        send_message(chat_id, "🌍 *Добро пожаловать в DeVox!*\n\nВыберите язык / Select language / 选择语言:", get_language_keyboard())
+        # Убрали "Добро пожаловать в DeVox!", оставили только выбор языка
+        send_message(chat_id, "🌍 *Выберите язык / Select language / 选择语言:*", get_language_keyboard())
     
     elif text == "/pet":
         handle_pet(chat_id)
     
     # ===== "ГДЕ Я?" (все варианты) =====
     elif any(word in text.lower() for word in ["где я", "мой адрес", "where am i", "我的位置", "покажи моё местоположение", "покажи мою локацию", "определи моё место", "моя локация", "где я нахожусь", "show my location", "моё местоположение"]):
+        # Отправляем анимацию думающего волка
+        send_video(chat_id, ANIMATIONS["thinking"])
+        
         saved_loc = load_user_location(chat_id)
         loc_to_use = None
         
@@ -974,7 +986,12 @@ def handle_message(message):
                 msg += f"🌤️ *Погода:* {weather_display}"
             
             send_message(chat_id, msg, get_pet_only_keyboard())
-            text_to_voice_yandex(f"Вы находитесь по адресу: {address}", chat_id)
+            # Полное озвучивание
+            voice_text = f"Ваше местоположение: {address}. "
+            if weather_display:
+                weather_clean = weather_display.replace('*', '').replace('_', '')
+                voice_text += f"Погода: {weather_clean}"
+            text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
             send_message(chat_id, "📍 *Локация не найдена*\n\nОтправьте геопозицию один раз, и я запомню её.", get_location_reply_keyboard())
     
@@ -1030,12 +1047,16 @@ def handle_callback(chat_id, data, callback_id):
         lang = user_lang.get(chat_id, "ru")
         msg, keyboard = get_city_attractions(city_name, lang)
         send_message(chat_id, msg, keyboard)
+        voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+        text_to_voice_yandex(voice_msg, chat_id, lang)
     
     elif data.startswith("food_"):
         city_name = data.replace("food_", "")
         lang = user_lang.get(chat_id, "ru")
         msg, keyboard = get_city_info_and_food(city_name, lang)
         send_message(chat_id, msg, keyboard)
+        voice_msg = msg.replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+        text_to_voice_yandex(voice_msg, chat_id, lang)
     
     elif data == "find_food":
         saved_loc = load_user_location(chat_id)
@@ -1049,6 +1070,8 @@ def handle_callback(chat_id, data, callback_id):
             send_message(chat_id, "🍽️ *Чтобы найти места, где поесть, отправьте геопозицию или напишите город.*\n\nНапример: «Что поесть в Москве?»", get_location_reply_keyboard())
     
     elif data == "where_am_i":
+        send_video(chat_id, ANIMATIONS["thinking"])
+        
         saved_loc = load_user_location(chat_id)
         loc_to_use = None
         
@@ -1066,7 +1089,11 @@ def handle_callback(chat_id, data, callback_id):
                 msg += f"🌤️ *Погода:* {weather_display}"
             
             send_message(chat_id, msg, get_pet_only_keyboard())
-            text_to_voice_yandex(f"Вы находитесь по адресу: {address}", chat_id)
+            voice_text = f"Ваше местоположение: {address}. "
+            if weather_display:
+                weather_clean = weather_display.replace('*', '').replace('_', '')
+                voice_text += f"Погода: {weather_clean}"
+            text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
             send_message(chat_id, "📍 *Локация не найдена*\n\nОтправьте геопозицию один раз, и я запомню её.", get_location_reply_keyboard())
     
@@ -1131,10 +1158,9 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
-    print("✅ Приветствие: 'Привет' - дружелюбный ответ")
-    print("✅ 'Где я?' + любые синонимы - адрес и погода (без кнопки билета)")
-    print("✅ 'Расскажи про [город]' - история города + кнопка билета")
-    print("✅ Погода + интересный факт + фраза 'Хотите узнать о других городах?' + кнопка билета")
-    print("✅ 'Что посмотреть' / 'Что поесть' / 'Чем славится' - всё работает")
+    print("✅ При выборе языка - только 'Выберите язык' на трёх языках")
+    print("✅ 'Где я?' - анимация + полное озвучивание адреса и погоды")
+    print("✅ 'Расскажи про Набережные Челны' - полное озвучивание + фраза про другие города + билет")
+    print("✅ 'Привет' - полное озвучивание")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
