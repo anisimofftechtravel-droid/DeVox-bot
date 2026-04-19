@@ -39,39 +39,30 @@ def format_number_with_word(number, word_forms):
     word_forms: [именительный ед., родительный ед., родительный мн.]
     Пример: format_number_with_word(2, ["градус", "градуса", "градусов"]) -> "2 градуса"
     """
-    num = int(number)
-    if 11 <= num % 100 <= 19:
+    try:
+        num = int(number)
+        if 11 <= num % 100 <= 19:
+            return f"{num} {word_forms[2]}"
+        last_digit = num % 10
+        if last_digit == 1:
+            return f"{num} {word_forms[0]}"
+        if 2 <= last_digit <= 4:
+            return f"{num} {word_forms[1]}"
         return f"{num} {word_forms[2]}"
-    last_digit = num % 10
-    if last_digit == 1:
-        return f"{num} {word_forms[0]}"
-    if 2 <= last_digit <= 4:
-        return f"{num} {word_forms[1]}"
-    return f"{num} {word_forms[2]}"
+    except:
+        return f"{number} {word_forms[2]}"
 
 def format_temperature(temp):
     """Форматирует температуру с правильным склонением"""
-    try:
-        t = int(temp)
-        return format_number_with_word(t, ["градус", "градуса", "градусов"])
-    except:
-        return f"{temp} градусов"
+    return format_number_with_word(temp, ["градус", "градуса", "градусов"])
 
 def format_wind_speed(speed):
     """Форматирует скорость ветра с правильным склонением"""
-    try:
-        s = int(speed)
-        return format_number_with_word(s, ["метр в секунду", "метра в секунду", "метров в секунду"])
-    except:
-        return f"{speed} метров в секунду"
+    return format_number_with_word(speed, ["метр в секунду", "метра в секунду", "метров в секунду"])
 
 def format_humidity(humidity):
     """Форматирует влажность с правильным склонением"""
-    try:
-        h = int(humidity)
-        return format_number_with_word(h, ["процент", "процента", "процентов"])
-    except:
-        return f"{humidity} процентов"
+    return format_number_with_word(humidity, ["процент", "процента", "процентов"])
 
 def format_day_name(day_offset, lang="ru"):
     """Возвращает название дня с правильным склонением"""
@@ -376,20 +367,19 @@ def get_weather_with_facts(city_name, day_offset=0, lang="ru"):
             fact = "🏛️ No interesting facts at the moment, but the city is definitely worth visiting!"
     
     day_text = format_day_name(day_offset, lang)
+    day_capitalized = day_text.capitalize()
     temp_formatted = format_temperature(weather['temp'])
     wind_formatted = format_wind_speed(weather['wind'])
     humidity_formatted = format_humidity(weather['humidity'])
     
     if lang == "ru":
-        response = f"{weather['emoji']} *{day_text.capitalize()}* {temp_formatted}, {weather['condition'].lower()}, "
-        response += f"{wind_formatted}, {humidity_formatted}.\n\n"
+        response = f"{weather['emoji']} *{day_capitalized}* {temp_formatted}, {weather['condition'].lower()}, {wind_formatted}, {humidity_formatted}.\n\n"
         response += f"🏝️ *Интересный факт:* {fact}\n\n"
-        response += f"🗺️ *Хотите узнать о других городах?* Спросите меня, например: «Какая погода в Сочи?»"
+        response += f"🗺️ *Хотите узнать о других городах?* Спросите меня."
     else:
-        response = f"{weather['emoji']} *{day_text.capitalize()}* {temp_formatted}, {weather['condition'].lower()}, "
-        response += f"{wind_formatted}, {humidity_formatted}.\n\n"
+        response = f"{weather['emoji']} *{day_capitalized}* {temp_formatted}, {weather['condition'].lower()}, {wind_formatted}, {humidity_formatted}.\n\n"
         response += f"🏝️ *Interesting fact:* {fact}\n\n"
-        response += f"🗺️ *Want to know about other cities?* Ask me, for example: \"What's the weather in Sochi?\""
+        response += f"🗺️ *Want to know about other cities?* Ask me."
     
     return response, weather, fact, day_text
 
@@ -400,9 +390,9 @@ def get_weather_for_voice_by_city(weather, fact, day_text, lang="ru"):
     humidity_formatted = format_humidity(weather['humidity'])
     
     if lang == "ru":
-        return f"{day_text}, {temp_formatted}, {weather_desc}. {wind_formatted}. {humidity_formatted}. {fact}. Хотите узнать о погоде в другом городе? Спросите меня!"
+        return f"{day_text}, {temp_formatted}, {weather_desc}. {wind_formatted}. {humidity_formatted}. {fact}. Хотите узнать о погоде в другом городе? Спросите меня."
     else:
-        return f"{day_text}, {temp_formatted}, {weather_desc}. {wind_formatted}. {humidity_formatted}. {fact}. Want to know the weather in another city? Ask me!"
+        return f"{day_text}, {temp_formatted}, {weather_desc}. {wind_formatted}. {humidity_formatted}. {fact}. Want to know the weather in another city? Ask me."
 
 def extract_city_and_day_from_text(text):
     text_lower = text.lower()
@@ -1024,7 +1014,7 @@ def handle_message(message):
             
             send_message(chat_id, msg, get_pet_only_keyboard())
             
-            # Голосовое сообщение (как в send_welcome_and_places)
+            # Голосовое сообщение
             voice_text = f"Ваше местоположение: {address}. "
             if weather_voice:
                 voice_text += f"Погода: {weather_voice}"
@@ -1199,8 +1189,8 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
-    print("✅ Погода: правильные склонения (2 градуса, 5 метров в секунду, 64 процента)")
+    print("✅ Погода: эмодзи + правильные склонения (2 градуса, 5 метров в секунду, 64 процента)")
+    print("✅ Фраза: 'Хотите узнать о других городах? Спросите меня.'")
     print("✅ 'Где я?' - полная озвучка с правильными склонениями")
-    print("✅ 'Что поесть в...' - без лишних заголовков")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
