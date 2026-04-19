@@ -430,7 +430,11 @@ def get_weather_for_voice_by_city(weather, fact, day_text, lang="ru"):
     wind_voice = format_wind_speed_voice(weather['wind'])
     humidity_voice = format_humidity_voice(weather['humidity'])
     
-    return f"{day_text}, {temp_voice}, {weather_desc}. {wind_voice}. {humidity_voice}. {fact}. Хотите узнать о погоде в другом городе? Спросите меня."
+    if lang == "ru":
+        # Теперь говорит "влажность X процентов"
+        return f"{day_text}, {temp_voice}, {weather_desc}. {wind_voice}. Влажность {humidity_voice}. {fact}. Хотите узнать о погоде в другом городе? Спросите меня."
+    else:
+        return f"{day_text}, {temp_voice}, {weather_desc}. {wind_voice}. Humidity {humidity_voice}. {fact}. Want to know the weather in another city? Ask me."
 
 def extract_city_and_day_from_text(text):
     text_lower = text.lower()
@@ -542,7 +546,7 @@ def get_weather_for_voice(lat, lon, lang="ru"):
         wind_voice = format_wind_speed_voice(wind_speed)
         humidity_voice = format_humidity_voice(humidity)
         
-        return f"сегодня {temp_voice}, {weather_desc}. {wind_voice}. {humidity_voice}."
+        return f"сегодня {temp_voice}, {weather_desc}. {wind_voice}. Влажность {humidity_voice}."
     except Exception as e:
         print(f"❌ Ошибка get_weather_for_voice: {e}")
         return None
@@ -1215,6 +1219,6 @@ if __name__ == "__main__":
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
     print("✅ Погода: красивый формат ☁️ 4°C 💨 14 м/с 💧 70%")
-    print("✅ Голос: правильные падежи (4 градуса, 14 метров в секунду, 70 процентов)")
+    print("✅ Голос: правильные падежи (4 градуса, 14 метров в секунду, влажность 70 процентов)")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
