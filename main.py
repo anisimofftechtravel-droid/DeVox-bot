@@ -452,6 +452,7 @@ def get_weather(lat, lon, lang="ru"):
         return None
 
 def get_weather_for_voice(lat, lon, lang="ru"):
+    """Голосовое сообщение о погоде (чистый текст, без эмодзи)"""
     try:
         url = f"https://wttr.in/{lat},{lon}?format=j1&lang={lang}&m"
         response = requests.get(url, timeout=10)
@@ -479,7 +480,7 @@ def get_weather_for_voice(lat, lon, lang="ru"):
         else:
             wind_text = f"ветер {wind_speed} метров в секунду"
         
-        return f"сегодня, {temp} градусов, {weather_desc}. {wind_text}. Влажность {humidity} процентов."
+        return f"сегодня {temp} градусов, {weather_desc}. {wind_text}. Влажность {humidity} процентов."
     except Exception as e:
         print(f"❌ Ошибка get_weather_for_voice: {e}")
         return None
@@ -619,16 +620,14 @@ def get_city_attractions(city_name, lang="ru"):
     return msg, keyboard
 
 def get_city_info_and_food(city_name, lang="ru"):
-    """Рассказывает о городе, его кухне и предлагает билеты (без геолокации)"""
+    """Рассказывает о городе, его кухне и предлагает билеты (без лишних заголовков)"""
     
     if lang == "ru":
-        prompt_city = f"Расскажи кратко, чем знаменит город {city_name}? Напиши 2-3 предложения об истории, культуре или атмосфере. Используй эмодзи."
+        prompt_city = f"Расскажи кратко, чем знаменит город {city_name}. Напиши 2-3 предложения об истории, культуре или атмосфере. Используй эмодзи."
         prompt_food = f"Какие блюда или кухня знамениты в городе {city_name}? Напиши 2-3 предложения, перечисли популярные блюда. Используй эмодзи."
-        msg = f"🏙️ *О городе и кухне*\n\n"
     else:
-        prompt_city = f"Tell briefly what the city of {city_name} is famous for? Write 2-3 sentences about history, culture or atmosphere. Use emojis."
+        prompt_city = f"Tell briefly what the city of {city_name} is famous for. Write 2-3 sentences about history, culture or atmosphere. Use emojis."
         prompt_food = f"What dishes or cuisine are famous in {city_name}? Write 2-3 sentences, list popular dishes. Use emojis."
-        msg = f"🏙️ *About the city and cuisine*\n\n"
     
     city_info = ask_yandexgpt(prompt_city, lang)
     food_info = ask_yandexgpt(prompt_food, lang)
@@ -645,8 +644,7 @@ def get_city_info_and_food(city_name, lang="ru"):
         else:
             food_info = f"🍽️ The local cuisine is famous for its diversity. Be sure to try traditional dishes in the best restaurants of the city!"
     
-    msg += f"📖 *О городе:*\n{city_info}\n\n"
-    msg += f"🍽️ *Что попробовать:*\n{food_info}\n\n"
+    msg = f"{city_info}\n\n{food_info}\n\n"
     
     if lang == "ru":
         msg += "🎫 *Хотите посетить этот город?*"
@@ -974,23 +972,20 @@ def handle_message(message):
         if loc_to_use:
             address = get_address(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
             weather_display = get_weather(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
+            weather_voice = get_weather_for_voice(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
             
-            # Сохраняем эмодзи для текста, но для голоса убираем
             msg = f"📍 *Ваше местоположение:*\n{address}\n\n"
             if weather_display:
                 msg += f"🌤️ *Погода:* {weather_display}"
             
             send_message(chat_id, msg, get_pet_only_keyboard())
             
-            # Голосовое сообщение (без эмодзи)
+            # Голосовое сообщение (как в send_welcome_and_places)
             voice_text = f"Ваше местоположение: {address}. "
-            if weather_display:
-                # Убираем эмодзи и Markdown для голоса
-                weather_clean = weather_display
-                for emoji in ["☀️", "⛅", "☁️", "🌧️", "🌨️", "⛈️", "🌫️", "🌡️", "💧", "💨", "*", "_", "°", "м/с", "km/h"]:
-                    weather_clean = weather_clean.replace(emoji, "")
-                weather_clean = re.sub(r'[^\w\s\.\,\-\d]', '', weather_clean).strip()
-                voice_text += f"Погода: {weather_clean}"
+            if weather_voice:
+                voice_text += f"Погода: {weather_voice}"
+            else:
+                voice_text += "Погода: данные не получены."
             text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
             send_message(chat_id, "📍 *Локация не найдена*\n\nОтправьте геопозицию один раз, и я запомню её.", get_location_reply_keyboard())
@@ -1083,6 +1078,7 @@ def handle_callback(chat_id, data, callback_id):
         if loc_to_use:
             address = get_address(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
             weather_display = get_weather(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
+            weather_voice = get_weather_for_voice(loc_to_use["lat"], loc_to_use["lon"], user_lang.get(chat_id, "ru"))
             
             msg = f"📍 *Ваше местоположение:*\n{address}\n\n"
             if weather_display:
@@ -1090,12 +1086,10 @@ def handle_callback(chat_id, data, callback_id):
             
             send_message(chat_id, msg, get_pet_only_keyboard())
             voice_text = f"Ваше местоположение: {address}. "
-            if weather_display:
-                weather_clean = weather_display
-                for emoji in ["☀️", "⛅", "☁️", "🌧️", "🌨️", "⛈️", "🌫️", "🌡️", "💧", "💨", "*", "_", "°", "м/с", "km/h"]:
-                    weather_clean = weather_clean.replace(emoji, "")
-                weather_clean = re.sub(r'[^\w\s\.\,\-\d]', '', weather_clean).strip()
-                voice_text += f"Погода: {weather_clean}"
+            if weather_voice:
+                voice_text += f"Погода: {weather_voice}"
+            else:
+                voice_text += "Погода: данные не получены."
             text_to_voice_yandex(voice_text, chat_id, user_lang.get(chat_id, "ru"))
         else:
             send_message(chat_id, "📍 *Локация не найдена*\n\nОтправьте геопозицию один раз, и я запомню её.", get_location_reply_keyboard())
@@ -1161,7 +1155,7 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 10000))
     print("=" * 50)
     print("🤖 DeVox запущен на Render!")
-    print("✅ 'Где я?' - эмодзи в тексте, голосом чисто")
-    print("✅ 'Расскажи про...' - без лишних заголовков")
+    print("✅ 'Где я?' - озвучка как в 'Добро пожаловать'")
+    print("✅ 'Что поесть в...' - без лишних заголовков")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port)
